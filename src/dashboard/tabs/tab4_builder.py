@@ -4,11 +4,21 @@ Tab 4. 대학평생교육원 마이크로디그리 패키징 시뮬레이터
 import streamlit as st
 import pandas as pd
 
-def render_tab4(analyzer, categories):
+def render_tab4(analyzer, categories, default_category=None):
     st.subheader("🚀 대학평생교육원 연계형 기본직무 마이크로디그리 패키징 시뮬레이터")
     st.write("관심 있는 기본 직무를 선택하면, [NCS 표준 능력단위 + 대학 K-MOOC 온라인 강좌 + 평생교육원 오프라인 실습]이 결합된 맞춤형 마이크로디그리 명세서를 즉시 생성합니다.")
     
-    selected_cat = st.selectbox("🎯 설계할 마이크로디그리 직무 분야", options=categories, key="tab4_cat_select")
+    # 사이드바에서 선택된 직무가 있으면 기본값으로 설정
+    default_idx = 0
+    if default_category and default_category in categories:
+        default_idx = categories.index(default_category)
+        
+    selected_cat = st.selectbox(
+        "🎯 설계할 마이크로디그리 직무 분야",
+        options=categories,
+        index=default_idx,
+        key="tab4_cat_select"
+    )
     
     package = analyzer.generate_microdegree_package(selected_cat)
     if not package:
