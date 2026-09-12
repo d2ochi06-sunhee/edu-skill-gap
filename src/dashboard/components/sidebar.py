@@ -23,13 +23,15 @@ def render_sidebar(categories, targets):
         )
         
         st.markdown("---")
-        st.markdown("#### 🔗 공공데이터 API 연동 상태")
+        st.markdown("#### 🔗 수도권 공공데이터 API 연동")
         st.markdown("""
-        - <span style="background-color:#DEF7EC;color:#03543F;padding:3px 8px;border-radius:4px;font-size:0.8rem;font-weight:600;">연동완료</span> **한국산업인력공단 NCS**
-        - <span style="background-color:#DEF7EC;color:#03543F;padding:3px 8px;border-radius:4px;font-size:0.8rem;font-weight:600;">연동완료</span> **국가평생교육진흥원 K-MOOC**
-        - <span style="background-color:#E1EFFE;color:#1E429F;padding:3px 8px;border-radius:4px;font-size:0.8rem;font-weight:600;">데이터준비</span> **원격훈련 모니터링통계**
+        - <span style="background-color:#DEF7EC;color:#03543F;padding:2px 6px;border-radius:4px;font-size:0.75rem;font-weight:600;">연동</span> **한국산업인력공단 NCS**
+        - <span style="background-color:#DEF7EC;color:#03543F;padding:2px 6px;border-radius:4px;font-size:0.75rem;font-weight:600;">연동</span> **국가평생교육진흥원 K-MOOC**
+        - <span style="background-color:#E1EFFE;color:#1E429F;padding:2px 6px;border-radius:4px;font-size:0.75rem;font-weight:600;">준비</span> **원격훈련 모니터링통계**
+        - <span style="background-color:#DEF7EC;color:#03543F;padding:2px 6px;border-radius:4px;font-size:0.75rem;font-weight:600;">등록</span> **서울시 평생학습포털**
+        - <span style="background-color:#DEF7EC;color:#03543F;padding:2px 6px;border-radius:4px;font-size:0.75rem;font-weight:600;">등록</span> **경기데이터드림**
         """, unsafe_allow_html=True)
-        st.caption("🔑 `.env` 환경변수 키 보안 적용")
+        st.caption("🔑 `.env` 보안 환경변수 관리 중")
         
         st.markdown("---")
         st.info("💡 **팀 협업 포인트**:\n평일 온라인(K-MOOC)과 주말 대학평생교육원(실습)의 연계 비율을 탭3과 탭4에서 확인해보세요!")

@@ -60,8 +60,42 @@ class EduDataCollector:
         except Exception as e:
             return {"error": str(e)}
 
+    def fetch_seoul_lifelong_courses(self, service_name="SeoulLifelongEduProgDesc", start_idx=1, end_idx=20):
+        """서울시 평생학습포털 강좌정보 API 호출 (서울 열린데이터광장)"""
+        seoul_key = os.getenv("SEOUL_LIFELONG_API_KEY")
+        if not seoul_key:
+            return {"error": "SEOUL_LIFELONG_API_KEY not found in .env"}
+        url = f"http://openapi.seoul.go.kr:8088/{seoul_key}/json/{service_name}/{start_idx}/{end_idx}/"
+        try:
+            res = requests.get(url, timeout=10)
+            return res.json()
+        except Exception as e:
+            return {"error": str(e)}
+
+    def fetch_gyeonggi_data(self, service_name, params=None):
+        """경기데이터드림 API 호출 (data.gg.go.kr)"""
+        gg_key = os.getenv("GG_DATA_DREAM_API_KEY")
+        if not gg_key:
+            return {"error": "GG_DATA_DREAM_API_KEY not found in .env"}
+        url = f"https://openapi.gg.go.kr/{service_name}"
+        default_params = {
+            "KEY": gg_key,
+            "Type": "json",
+            "pIndex": 1,
+            "pSize": 20
+        }
+        if params:
+            default_params.update(params)
+        try:
+            res = requests.get(url, params=default_params, timeout=10)
+            return res.json()
+        except Exception as e:
+            return {"error": str(e)}
+
 if __name__ == "__main__":
     collector = EduDataCollector()
     print("Testing NCS API call...")
-    result = collector.fetch_ncs_courses()
-    print("Result:", result)
+    print(collector.fetch_ncs_courses())
+    print("\nTesting Seoul Lifelong API call...")
+    print(collector.fetch_seoul_lifelong_courses())
+
