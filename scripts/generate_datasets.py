@@ -1,8 +1,5 @@
 """
-수도권 대학평생교육원 기반 기본직무 EDA 데이터셋 생성기
-- 5대 기본 직무 (경영기획, 디지털마케팅, 회계세무, 유통이커머스, 인사노무)
-- 수도권 대학평생교육원 K-MOOC 연계 강좌 풀
-- 재직자/성인학습자 원격훈련 수료율 및 학습행동 통계
+수도권(대학 평생교육원 + 서울시 평생학습포털 + 경기데이터드림) 통합 EDA 데이터셋 생성기
 """
 import os
 import pandas as pd
@@ -37,21 +34,35 @@ ncs_basic_jobs = [
 df_ncs = pd.DataFrame(ncs_basic_jobs)
 df_ncs.to_csv("data/sample/ncs_curriculums.csv", index=False, encoding="utf-8-sig")
 
-# 2. 수도권 대학부설 평생교육원 K-MOOC 연계 강좌 자원
-kmooc_lifelong_data = [
-    {"univ_name": "서울대 평생교육원", "region": "서울 관악", "course_title": "데이터로 세상 읽기: 비즈니스 통계 기초", "category": "경영·기획·사무", "credit_type": "학점은행제 인정", "weeks": 12, "weekly_hours": 3, "matched_code": "02010102"},
-    {"univ_name": "연세대 미래교육원", "region": "서울 서대문", "course_title": "디지털 시대의 설득 커뮤니케이션과 기획", "category": "경영·기획·사무", "credit_type": "이수증 발급", "weeks": 8, "weekly_hours": 2, "matched_code": "02010101"},
-    {"univ_name": "고려대 평생교육원", "region": "서울 성북", "course_title": "빅데이터 기반 고객경험(CX) 마케팅", "category": "디지털 마케팅 & 홍보", "credit_type": "학점은행제 인정", "weeks": 10, "weekly_hours": 3, "matched_code": "02020101"},
-    {"univ_name": "한양대 미래인재교육원", "region": "서울 성동", "course_title": "생활 속의 회계와 창업 재무관리", "category": "회계·재무·세무", "credit_type": "학점은행제 인정", "weeks": 12, "weekly_hours": 3, "matched_code": "02030101"},
-    {"univ_name": "건국대 미래지식교육원", "region": "서울 광진", "course_title": "이커머스 비즈니스 모델과 플랫폼 유통", "category": "유통·물류·이커머스", "credit_type": "학점은행제 인정", "weeks": 10, "weekly_hours": 3, "matched_code": "02040101"},
-    {"univ_name": "경희대 글로벌미래교육원", "region": "서울 동대문", "course_title": "조직행동론: 사람을 움직이는 리더십", "category": "인사·총무·노무", "credit_type": "이수증 발급", "weeks": 8, "weekly_hours": 2, "matched_code": "02050102"},
-    {"univ_name": "인하대 평생교육원", "region": "인천 미추홀", "course_title": "스마트 물류와 항만 유통의 이해", "category": "유통·물류·이커머스", "credit_type": "학점은행제 인정", "weeks": 12, "weekly_hours": 3, "matched_code": "02040102"},
-    {"univ_name": "아주대 평생교육원", "region": "경기 수원", "course_title": "현대 노동법과 인적자원관리", "category": "인사·총무·노무", "credit_type": "학점은행제 인정", "weeks": 10, "weekly_hours": 3, "matched_code": "02050101"}
-]
-df_kmooc = pd.DataFrame(kmooc_lifelong_data)
-df_kmooc.to_csv("data/sample/kmooc_courses.csv", index=False, encoding="utf-8-sig")
+# 2. 수도권 통합 평생교육 강좌 자원 (대학 K-MOOC + 서울시 평생학습포털 + 경기데이터드림)
+metro_lifelong_courses = [
+    # [대학 평생교육원 / K-MOOC]
+    {"source_api": "K-MOOC(대학)", "org_name": "서울대 평생교육원", "region": "서울 관악", "course_title": "데이터로 세상 읽기: 비즈니스 통계 기초", "category": "경영·기획·사무", "credit_type": "학점은행제 인정", "cost": "무료", "weeks": 12, "weekly_hours": 3, "matched_code": "02010102"},
+    {"source_api": "K-MOOC(대학)", "org_name": "연세대 미래교육원", "region": "서울 서대문", "course_title": "디지털 시대의 설득 커뮤니케이션과 기획", "category": "경영·기획·사무", "credit_type": "이수증 발급", "cost": "무료", "weeks": 8, "weekly_hours": 2, "matched_code": "02010101"},
+    {"source_api": "K-MOOC(대학)", "org_name": "고려대 평생교육원", "region": "서울 성북", "course_title": "빅데이터 기반 고객경험(CX) 마케팅", "category": "디지털 마케팅 & 홍보", "credit_type": "학점은행제 인정", "cost": "무료", "weeks": 10, "weekly_hours": 3, "matched_code": "02020101"},
+    {"source_api": "K-MOOC(대학)", "org_name": "한양대 미래인재교육원", "region": "서울 성동", "course_title": "생활 속의 회계와 창업 재무관리", "category": "회계·재무·세무", "credit_type": "학점은행제 인정", "cost": "무료", "weeks": 12, "weekly_hours": 3, "matched_code": "02030101"},
+    {"source_api": "K-MOOC(대학)", "org_name": "건국대 미래지식교육원", "region": "서울 광진", "course_title": "이커머스 비즈니스 모델과 플랫폼 유통", "category": "유통·물류·이커머스", "credit_type": "학점은행제 인정", "cost": "무료", "weeks": 10, "weekly_hours": 3, "matched_code": "02040101"},
+    {"source_api": "K-MOOC(대학)", "org_name": "인하대 평생교육원", "region": "인천 미추홀", "course_title": "스마트 물류와 항만 유통의 이해", "category": "유통·물류·이커머스", "credit_type": "학점은행제 인정", "cost": "무료", "weeks": 12, "weekly_hours": 3, "matched_code": "02040102"},
+    {"source_api": "K-MOOC(대학)", "org_name": "아주대 평생교육원", "region": "경기 수원", "course_title": "현대 노동법과 인적자원관리", "category": "인사·총무·노무", "credit_type": "학점은행제 인정", "cost": "무료", "weeks": 10, "weekly_hours": 3, "matched_code": "02050101"},
 
-# 3. 원격훈련 모니터링 통계 (성인학습자 및 재직자 학습행태)
+    # [서울시 평생학습포털 API]
+    {"source_api": "서울시 평생학습포털", "org_name": "서울시민대학(중구)", "region": "서울 중구", "course_title": "ChatGPT를 활용한 직무 보고서 및 사업기획서 완성", "category": "경영·기획·사무", "credit_type": "서울시민학위제 인정", "cost": "무료", "weeks": 6, "weekly_hours": 2, "matched_code": "02010101"},
+    {"source_api": "서울시 평생학습포털", "org_name": "마포구 평생학습관", "region": "서울 마포", "course_title": "인스타그램 릴스 & 유튜브 쇼츠 실전 제작 워크숍", "category": "디지털 마케팅 & 홍보", "credit_type": "수료증 발급", "cost": "무료", "weeks": 4, "weekly_hours": 3, "matched_code": "02020102"},
+    {"source_api": "서울시 평생학습포털", "org_name": "강남구 평생학습센터", "region": "서울 강남", "course_title": "직장인을 위한 연말정산과 원천세 절세 특강", "category": "회계·재무·세무", "credit_type": "수료증 발급", "cost": "무료", "weeks": 4, "weekly_hours": 2, "matched_code": "02030101"},
+    {"source_api": "서울시 평생학습포털", "org_name": "동대문구 평생학습관", "region": "서울 동대문", "course_title": "동대문 패션상권 기반 스마트스토어 창업 실무", "category": "유통·물류·이커머스", "credit_type": "수료증 발급", "cost": "무료", "weeks": 8, "weekly_hours": 3, "matched_code": "02040101"},
+    {"source_api": "서울시 평생학습포털", "org_name": "영등포구 평생학습원", "region": "서울 영등포", "course_title": "스타트업 & 중소기업 인사담당자 노동법 클리닉", "category": "인사·총무·노무", "credit_type": "수료증 발급", "cost": "무료", "weeks": 6, "weekly_hours": 2, "matched_code": "02050101"},
+
+    # [경기데이터드림 API]
+    {"source_api": "경기데이터드림", "org_name": "경기도 지식(GSEEK)", "region": "경기 수원", "course_title": "엑셀로 끝내는 실무 비즈니스 데이터 시각화", "category": "경영·기획·사무", "credit_type": "경기도지사 수료증", "cost": "무료", "weeks": 6, "weekly_hours": 2, "matched_code": "02010102"},
+    {"source_api": "경기데이터드림", "org_name": "판교스타트업캠퍼스", "region": "경기 성남", "course_title": "판교 IT기업 스타일 퍼포먼스 마케팅 실전", "category": "디지털 마케팅 & 홍보", "credit_type": "전문가 수료증", "cost": "무료", "weeks": 8, "weekly_hours": 3, "matched_code": "02020101"},
+    {"source_api": "경기데이터드림", "org_name": "경기도 지식(GSEEK)", "region": "경기 용인", "course_title": "중소제조업 회계전표 입력부터 결산까지 한 번에", "category": "회계·재무·세무", "credit_type": "경기도지사 수료증", "cost": "무료", "weeks": 8, "weekly_hours": 2, "matched_code": "02030101"},
+    {"source_api": "경기데이터드림", "org_name": "평택항만물류교육센터", "region": "경기 평택", "course_title": "경기남부 복합물류센터 WMS 풀필먼트 운영 기초", "category": "유통·물류·이커머스", "credit_type": "물류이수증", "cost": "무료", "weeks": 8, "weekly_hours": 3, "matched_code": "02040102"},
+    {"source_api": "경기데이터드림", "org_name": "고양시 평생학습관", "region": "경기 고양", "course_title": "중소기업 MZ세대 온보딩과 사내 커뮤니케이션", "category": "인사·총무·노무", "credit_type": "수료증 발급", "cost": "무료", "weeks": 6, "weekly_hours": 2, "matched_code": "02050102"},
+]
+df_courses = pd.DataFrame(metro_lifelong_courses)
+df_courses.to_csv("data/sample/kmooc_courses.csv", index=False, encoding="utf-8-sig")
+
+# 3. 원격훈련 모니터링 통계
 np.random.seed(100)
 targets = ["수도권 중소·중견 재직자", "경력단절/재취업 준비생", "소상공인/1인 창업자"]
 hours_steps = [20, 30, 40, 50, 60, 80]
@@ -59,12 +70,9 @@ records = []
 
 for t in targets:
     for h in hours_steps:
-        # 온라인 시수가 길수록 수료율 급감 (40시간 초과 시 하락폭 증가)
         drop_rate = 0.35 if h <= 40 else 0.65
         base_rate = 94.0 - ((h - 20) * drop_rate)
         comp = round(max(38.0, base_rate + np.random.normal(0, 2.0)), 1)
-        
-        # 권장 온라인 비율: 시수가 길어질수록 오프라인 실습(평생교육원) 비중을 늘려야 완주 가능
         rec_online = 70 if h <= 30 else (60 if h <= 45 else 50)
         
         records.append({
@@ -79,4 +87,4 @@ for t in targets:
 
 df_stats = pd.DataFrame(records)
 df_stats.to_csv("data/sample/remote_learning_stats.csv", index=False, encoding="utf-8-sig")
-print("[OK] Lifelong learning datasets generated successfully!")
+print("[OK] Integrated Metro Lifelong Learning dataset generated successfully!")
