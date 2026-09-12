@@ -68,9 +68,25 @@ filtered_ncs = df_ncs if selected_category == "전체" else df_ncs[df_ncs["categ
 filtered_kmooc = df_kmooc if selected_category == "전체" else df_kmooc[df_kmooc["category"] == selected_category]
 filtered_stats = df_stats if selected_target == "전체" else df_stats[df_stats["target_group"] == selected_target]
 
-# 4. 헤더 영역
+# 4. 헤더 및 전체 프로세스 파이프라인 안내
 st.markdown('<div class="main-title">수도권 대학평생교육원 기반 기본직무 마이크로디그리 & 하이브리드 재교육 EDA</div>', unsafe_allow_html=True)
 st.markdown('<div class="sub-title">한국산업인력공단 NCS(기본직무) · 국가평생교육진흥원 K-MOOC(대학평생교육원) · 원격훈련모니터링 통계 기반 산학 재교육 탐색 대시보드</div>', unsafe_allow_html=True)
+
+# 4단계 프로세스 로드맵 카드
+st.markdown("""
+<div style="background-color: #F1F5F9; border-radius: 8px; padding: 14px 20px; margin-bottom: 20px; border-left: 5px solid #2563EB;">
+    <div style="font-weight: 700; color: #1E293B; margin-bottom: 6px;">🔄 프로젝트 핵심 워크플로우 한눈에 보기</div>
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; font-size: 0.9rem; color: #334155;">
+        <span>🏢 <b>1. 수도권 기업 수요</b> (5대 기본직무)</span>
+        <span>➔</span>
+        <span>📋 <b>2. NCS 표준 역량</b> (능력단위 30~45H)</span>
+        <span>➔</span>
+        <span>🌐 <b>3. 하이브리드 재교육</b> (온라인 60% + 평생교육원 40%)</span>
+        <span>➔</span>
+        <span>🎓 <b>4. 마이크로디그리 이수</b> (학점인정/이수증)</span>
+    </div>
+</div>
+""", unsafe_allow_html=True)
 
 # 5. KPI 메트릭 카드 렌더링
 render_kpi_metrics(filtered_ncs, filtered_kmooc, filtered_stats)
