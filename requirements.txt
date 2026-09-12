@@ -6,6 +6,7 @@ xmltodict>=0.13.0
 # Data Analysis
 pandas>=2.0.0
 numpy>=1.24.0
+statsmodels>=0.14.0
 
 # Dashboard & Visualization
 streamlit>=1.30.0
