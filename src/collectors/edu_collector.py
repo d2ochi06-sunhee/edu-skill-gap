@@ -13,6 +13,14 @@ class EduDataCollector:
         self.decoding_key = os.getenv("DATA_GO_KR_API_KEY_DECODING")
         self.encoding_key = os.getenv("DATA_GO_KR_API_KEY_ENCODING")
         
+        # 고용24 / HRD-Net / 워크넷 인증키
+        self.hrd_kmbc_key = os.getenv("HRD_KMBC_API_KEY")
+        self.hrd_employer_key = os.getenv("HRD_EMPLOYER_TRAINING_API_KEY")
+        self.hrd_work_study_key = os.getenv("HRD_WORK_STUDY_API_KEY")
+        self.worknet_job_key = os.getenv("WORKNET_JOB_INFO_API_KEY")
+        self.worknet_major_key = os.getenv("WORKNET_MAJOR_INFO_API_KEY")
+        self.worknet_occupation_key = os.getenv("WORKNET_OCCUPATION_INFO_API_KEY")
+        
     def fetch_ncs_courses(self, params=None):
         """NCS 교육과정 API 호출"""
         url = "http://apis.data.go.kr/B490007/ncsEduCource/openapi20"
@@ -26,6 +34,54 @@ class EduDataCollector:
         try:
             res = requests.get(url, params=default_params, timeout=10)
             return res.json()
+        except Exception as e:
+            return {"error": str(e)}
+
+    def fetch_ncs_job_base(self, endpoint_url=None, params=None):
+        """한국산업인력공단 NCS 직업기초능력 API 호출"""
+        url = endpoint_url or "https://apis.data.go.kr/B490007/ncsJobBase"
+        default_params = {
+            "serviceKey": os.getenv("NCS_JOB_BASE_API_KEY_DECODING") or self.decoding_key,
+            "pageNo": 1,
+            "numOfRows": 20
+        }
+        if params:
+            default_params.update(params)
+        try:
+            res = requests.get(url, params=default_params, timeout=10)
+            return res.text
+        except Exception as e:
+            return {"error": str(e)}
+
+    def fetch_ncs_standard(self, endpoint_url=None, params=None):
+        """한국산업인력공단 NCS 기준정보 조회 API 호출"""
+        url = endpoint_url or "https://apis.data.go.kr/B490007/hrdkapi"
+        default_params = {
+            "serviceKey": os.getenv("NCS_STANDARD_API_KEY_DECODING") or self.decoding_key,
+            "pageNo": 1,
+            "numOfRows": 20
+        }
+        if params:
+            default_params.update(params)
+        try:
+            res = requests.get(url, params=default_params, timeout=10)
+            return res.text
+        except Exception as e:
+            return {"error": str(e)}
+
+    def fetch_ncs_position_link(self, endpoint_url=None, params=None):
+        """한국산업인력공단 NCS 직급연계 정보 API 호출"""
+        url = endpoint_url or "https://apis.data.go.kr/B490007/ncsPositionLink"
+        default_params = {
+            "serviceKey": os.getenv("NCS_POSITION_LINK_API_KEY_DECODING") or self.decoding_key,
+            "pageNo": 1,
+            "numOfRows": 20
+        }
+        if params:
+            default_params.update(params)
+        try:
+            res = requests.get(url, params=default_params, timeout=10)
+            return res.text
         except Exception as e:
             return {"error": str(e)}
 
@@ -91,6 +147,66 @@ class EduDataCollector:
             return res.json()
         except Exception as e:
             return {"error": str(e)}
+
+    def fetch_hrd_courses(self, auth_key, params=None, endpoint_url=None):
+        """HRD-Net 훈련과정 공통 API 호출 (XML 응답 반환)"""
+        if not auth_key:
+            return {"error": "API Key is required"}
+        url = endpoint_url or "http://www.hrd.go.kr/jsp/HRDP/HRDPO00/HRDPOA60/HRDPOA60_1.jsp"
+        default_params = {
+            "authKey": auth_key,
+            "returnType": "XML",
+            "outType": "1",
+            "pageNum": "1",
+            "pageSize": "20"
+        }
+        if params:
+            default_params.update(params)
+        try:
+            res = requests.get(url, params=default_params, timeout=10)
+            return res.text
+        except Exception as e:
+            return {"error": str(e)}
+
+    def fetch_kmbc_courses(self, params=None):
+        """국민내일배움카드 훈련과정 API 호출"""
+        return self.fetch_hrd_courses(self.hrd_kmbc_key, params=params)
+
+    def fetch_employer_training_courses(self, params=None):
+        """사업주훈련 훈련과정 API 호출"""
+        return self.fetch_hrd_courses(self.hrd_employer_key, params=params)
+
+    def fetch_work_study_courses(self, params=None):
+        """일학습병행 훈련과정 API 호출"""
+        return self.fetch_hrd_courses(self.hrd_work_study_key, params=params)
+
+    def fetch_worknet_info(self, auth_key, endpoint_url, params=None):
+        """워크넷 (직무/학과/직업 등) API 호출"""
+        if not auth_key:
+            return {"error": "API Key is required"}
+        default_params = {
+            "authKey": auth_key,
+            "returnType": "XML"
+        }
+        if params:
+            default_params.update(params)
+        try:
+            res = requests.get(endpoint_url, params=default_params, timeout=10)
+            return res.text
+        except Exception as e:
+            return {"error": str(e)}
+
+    def fetch_job_info(self, endpoint_url, params=None):
+        """직무정보 API 호출"""
+        return self.fetch_worknet_info(self.worknet_job_key, endpoint_url, params=params)
+
+    def fetch_major_info(self, endpoint_url, params=None):
+        """학과정보 API 호출"""
+        return self.fetch_worknet_info(self.worknet_major_key, endpoint_url, params=params)
+
+    def fetch_occupation_info(self, endpoint_url, params=None):
+        """직업정보 API 호출"""
+        return self.fetch_worknet_info(self.worknet_occupation_key, endpoint_url, params=params)
 
 if __name__ == "__main__":
     collector = EduDataCollector()
