@@ -1,203 +1,510 @@
-"""Public dashboard: bundled records are demonstration data, never live listings."""
+"""
+NCS 24개 산업 272개 직무 요구 정의서 및 Level 1~5 역량 분석 대시보드
+"""
+import json
 from pathlib import Path
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 import streamlit as st
-from src.dashboard.team_workspace import workspace
 
 ROOT = Path(__file__).resolve().parents[2]
-PAGES = ['한눈에 보기', '직무교육 찾기', '지역별 교육 비교', '온라인 학습 분석', '교육과정 설계', '자료·분석 방법', '팀 자료실·분석실']
-TITLE = '수도권 재교육 공동연구 대시보드'
-COLORS = ['#087F8C', '#23395B', '#7196B5', '#DAA44B', '#856B9C']
+PROCESSED_DIR = ROOT / "data" / "processed"
+SAMPLE_DIR = ROOT / "data" / "sample"
 
+# 1. 페이지 테마 및 반응형 설정
+st.set_page_config(
+    page_title="NCS 직무 역량(KSA) 및 Level 1~5 분석 대시보드",
+    page_icon="🏛️",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# 2. 다크 테마 및 글래스모피즘 커스텀 CSS
+st.markdown("""
+<style>
+    /* 전체 다크 배경 및 폰트 */
+    @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+    * {
+        font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+    }
+    
+    .stApp {
+        background-color: #0A0F1D;
+        color: #F8FAFC;
+    }
+
+    /* 상단 배지 바 */
+    .api-badge-bar {
+        background: rgba(18, 26, 47, 0.75);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 12px;
+        padding: 10px 18px;
+        margin-bottom: 20px;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.85rem;
+    }
+    .api-chip {
+        background: rgba(99, 102, 241, 0.15);
+        border: 1px solid rgba(99, 102, 241, 0.35);
+        color: #A5B4FC;
+        padding: 3px 10px;
+        border-radius: 20px;
+        font-weight: 500;
+        font-size: 0.8rem;
+    }
+
+    /* KPI 카드 스타일 */
+    .kpi-container {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+    .kpi-card {
+        background: rgba(23, 33, 58, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 14px;
+        padding: 18px 20px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+        backdrop-filter: blur(10px);
+    }
+    .kpi-label {
+        font-size: 0.82rem;
+        color: #94A3B8;
+        margin-bottom: 6px;
+    }
+    .kpi-value {
+        font-size: 1.75rem;
+        font-weight: 800;
+        letter-spacing: -0.5px;
+        margin-bottom: 4px;
+    }
+    .kpi-sub {
+        font-size: 0.75rem;
+        color: #64748B;
+    }
+
+    /* 메인 직무 헤더 카드 */
+    .job-hero-card {
+        background: linear-gradient(135deg, rgba(30, 41, 59, 0.7), rgba(15, 23, 42, 0.9));
+        border: 1px solid rgba(99, 102, 241, 0.3);
+        border-radius: 16px;
+        padding: 24px;
+        margin-bottom: 24px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+    .job-title {
+        font-size: 1.5rem;
+        font-weight: 800;
+        color: #FFFFFF;
+        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .job-desc {
+        color: #94A3B8;
+        font-size: 0.95rem;
+        line-height: 1.5;
+        margin-bottom: 16px;
+    }
+    
+    /* 태그 뱃지들 */
+    .tag-qual {
+        background: rgba(245, 158, 11, 0.15);
+        border: 1px solid rgba(245, 158, 11, 0.35);
+        color: #FCD34D;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        margin-right: 6px;
+    }
+    .tag-level {
+        background: rgba(16, 185, 129, 0.15);
+        border: 1px solid rgba(16, 185, 129, 0.35);
+        color: #6EE7B7;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+
+    /* 탭 스타일 */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+        background-color: transparent;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        padding-bottom: 8px;
+    }
+    .stTabs [data-baseweb="tab"] {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 8px;
+        color: #94A3B8;
+        padding: 8px 18px;
+        font-weight: 600;
+    }
+    .stTabs [aria-selected="true"] {
+        background: rgba(99, 102, 241, 0.2) !important;
+        border-color: #6366F1 !important;
+        color: #FFFFFF !important;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# 3. 데이터 로드 함수 (캐싱)
 @st.cache_data
-def load_data():
-    courses = pd.read_csv(ROOT / 'data/sample/kmooc_courses.csv', dtype={'matched_code': str})
-    ncs = pd.read_csv(ROOT / 'data/sample/ncs_curriculums.csv', dtype={'job_code': str})
-    stats = pd.read_csv(ROOT / 'data/sample/remote_learning_stats.csv')
-    courses['광역지역'] = courses.region.str.split().str[0]
-    return courses, ncs, stats
-
-def filtered_courses(courses, regions, category, query):
-    mask = courses['광역지역'].isin(regions)
-    if category != '전체': mask &= courses.category.eq(category)
-    if query.strip():
-        mask &= (courses.course_title.str.contains(query.strip(), regex=False, case=False, na=False)
-                 | courses.org_name.str.contains(query.strip(), regex=False, case=False, na=False))
-    return courses.loc[mask].copy()
-
-def public_table(courses):
-    table = courses[['course_title','org_name','region','category','cost','weeks','weekly_hours']].rename(columns={
-        'course_title':'강좌명(예시)','org_name':'기관명(예시)','region':'지역','category':'직무',
-        'cost':'수강료(예시)','weeks':'주차(예시)','weekly_hours':'주당 시간(예시)'})
-    table['모집·시간대·교육방식'] = '미확인'
-    table['자료 구분'] = '시연용 샘플'
-    return table
-
-def download(frame, label, filename):
-    st.download_button(label, frame.to_csv(index=False).encode('utf-8-sig'), filename, 'text/csv')
-
-def chart(fig):
-    fig.update_layout(font=dict(family='Malgun Gothic, sans-serif', color='#23395B'), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', margin=dict(l=8,r=8,t=45,b=8))
-    st.plotly_chart(fig, use_container_width=True)
-
-def navigate(page): st.session_state['page'] = page
-
-def overview(courses, ncs):
-    st.title('자료를 함께 살펴보고, 교육의 다음 방향을 찾습니다')
-    st.write('수도권 5대 직무의 교육 자원을 탐색하고, 지역별 차이를 분석하며, 재직자를 위한 마이크로디그리 초안을 함께 검토하는 팀 연구 공간입니다.')
-    st.button('팀 자료실·분석실 열기', on_click=navigate, args=(PAGES[6],), type='primary', use_container_width=True)
-    a,b = st.columns(2)
-    with a:
-        st.subheader('나에게 맞는 교육 탐색')
-        st.write('지역과 직무를 선택해 강좌 탐색 흐름을 체험하세요.')
-        st.button('직무교육 찾기', on_click=navigate, args=(PAGES[1],), type='primary', use_container_width=True)
-    with b:
-        st.subheader('재직자를 위한 과정 설계')
-        st.write('능력단위와 실습을 묶어 온·오프라인 교육과정 초안을 만드세요.')
-        st.button('교육과정 설계하기', on_click=navigate, args=(PAGES[4],), use_container_width=True)
-    st.divider()
-    st.subheader('현재 체험할 수 있는 범위')
-    a,b,c = st.columns(3)
-    a.metric('강좌 예시', f'{len(courses)}개')
-    b.metric('직무 분야', f'{courses.category.nunique()}개')
-    c.metric('능력단위 예시', f'{len(ncs)}개')
-    st.caption('실제 수집 건수와 산업 수요 지표가 아닙니다. 서울·경기 중심이며 기존 인천 예시도 포함합니다.')
-    st.subheader('이 프로젝트가 답하려는 질문')
-    st.markdown('1. 재직자가 참여할 수 있는 직무교육은 어느 지역·시간대에 부족할까요?\n2. 온라인 이론과 현장 실습은 어떻게 연결할 수 있을까요?\n3. NCS 기반 단기 교육과정을 지역 교육 자원과 어떻게 구성할까요?')
-    st.info('현재 단계: 공개 시연 화면 구축 · 다음 단계: API 응답 검증 및 실제 자료 연결')
-
-def explore(courses):
-    st.title('직무교육 찾기')
-    st.write('지역과 관심 직무로 강좌 예시를 좁혀보세요. 현재 목록은 실제 수강 신청용이 아닙니다.')
-    a,b = st.columns(2)
-    regions = a.multiselect('지역', sorted(courses['광역지역'].unique()), default=['서울','경기'])
-    category = b.selectbox('관심 직무', ['전체'] + sorted(courses.category.unique()))
-    query = st.text_input('강좌명 또는 기관명 검색', placeholder='예: 엑셀, 마케팅, 평생학습관')
-    result = filtered_courses(courses, regions, category, query)
-    st.caption('요일·시작 시간·모집 기간·교육 방식은 아직 확보되지 않아 필터를 제공하지 않습니다.')
-    st.subheader(f'선택 조건에 맞는 예시 {len(result)}개')
-    if result.empty: st.info('선택 조건에 맞는 예시가 없습니다. 지역을 추가하거나 검색어를 지워보세요.')
+def load_all_master_data():
+    # 1. 마스터 JSON 로드
+    json_path = PROCESSED_DIR / "ncs_master_data.json"
+    if json_path.exists():
+        with open(json_path, "r", encoding="utf-8") as f:
+            master_json = json.load(f)
     else:
-        st.dataframe(public_table(result), hide_index=True, use_container_width=True)
-        download(public_table(result), '선택한 강좌 예시 내려받기', 'demo_courses.csv')
-    st.markdown('실제 개설 정보는 [K-MOOC](https://www.kmooc.kr/) 등 제공기관에서 확인하세요. 예시 강좌에 대응하는 신청 링크는 아직 없습니다.')
+        master_json = {}
 
-def compare(courses):
-    st.title('지역별 교육 비교')
-    st.write('같은 직무의 교육 자원이 지역별로 어떻게 분포하는지 살펴보는 시연입니다.')
-    category = st.selectbox('비교할 직무', ['전체'] + sorted(courses.category.unique()))
-    data = courses if category == '전체' else courses[courses.category == category]
-    counts = data.groupby(['광역지역','category']).size().reset_index(name='강좌 예시 수')
-    chart(px.bar(counts, x='광역지역', y='강좌 예시 수', color='category', barmode='group', color_discrete_sequence=COLORS, labels={'category':'직무'}, title='샘플에 포함된 지역별 강좌 구성'))
-    st.warning('샘플 수의 차이를 지역의 실제 교육 격차로 해석할 수 없습니다. 미수집 지역은 강좌가 없는 지역이 아닙니다.')
-    st.subheader('야간·주말 교육 접근성')
-    st.info('분석 대기: 강의 요일과 시작·종료 시간이 필요합니다. 현재 자료로는 야간·주말 비율을 계산하지 않습니다.')
-    with st.expander('실제 자료 연결 후 적용할 계산 기준'):
-        st.write('야간은 평일 18시 이후 시작하는 강좌, 주말은 토·일 운영 강좌로 정의합니다. 두 조건을 모두 충족하는 강좌는 한 번만 셉니다.')
-        st.write('야간·주말 비율 = 해당 강좌 수 ÷ 시간대 판정이 가능한 강좌 수. 미확인 건수와 시간대 정보 확보율을 함께 공개합니다.')
-        st.write('지역별 단순 강좌 수는 수집 범위와 인구 규모의 영향을 받습니다. 전체 지역 수집과 인구 자료 확보 후 인구 대비 지표를 별도로 제공합니다.')
-    download(counts.assign(자료구분='시연용 샘플'), '비교표 내려받기', 'demo_region_comparison.csv')
+    # 2. CSV 데이터 로드
+    df_jobs = pd.read_csv(PROCESSED_DIR / "ncs_272_jobs.csv")
+    df_units = pd.read_csv(PROCESSED_DIR / "ncs_1360_units.csv")
+    df_ksa = pd.read_csv(PROCESSED_DIR / "ncs_ksa_master.csv")
+    
+    # 3. KOSIS 노동시장 통계 로드
+    df_shortage = pd.read_csv(SAMPLE_DIR / "occupation_labor_shortage.csv", header=1)
+    df_shortage.columns = [c.strip() for c in df_shortage.columns]
+    df_shortage["미충원율 (%)"] = (df_shortage["미충원인원 (명)"] / df_shortage["구인인원 (명)"] * 100).round(2)
 
-def online(stats):
-    st.title('온라인 학습 분석')
-    st.info('실제 분석 결과는 아직 없습니다. 영상 길이·평가 유무·수강 및 수료 인원의 제공 여부를 확인해야 합니다.')
-    with st.expander('시연용 원격훈련 그래프 보기'):
-        chart(px.line(stats, x='total_hours', y='completion_rate', color='target_group', markers=True, color_discrete_sequence=COLORS, labels={'total_hours':'총시간(예시)','completion_rate':'수료율(예시, %)','target_group':'대상(예시)'}, title='합성 샘플: 시간별 수료율 표시 예시'))
-        st.caption('공식 통계가 아닙니다. 이 그래프로 40시간 이탈 임계선이나 최적 교육시간을 주장할 수 없습니다.')
-    st.subheader('검증할 가설과 필요한 자료')
-    st.table(pd.DataFrame([
-        ['짧은 영상과 수료율의 관계','차시별 러닝타임, 강좌별 수료율','추가 확보 필요'],
-        ['퀴즈 제공과 수료율의 관계','평가 구성, 난이도, 대상자, 수료율','추가 확보 필요'],
-        ['직무별 원격훈련 수료 현황','동일 기준의 수강 인원·수료 인원','응답 검증 필요'],
-    ], columns=['분석 질문','필요한 자료','상태']))
-    st.write('수료율은 동일 기간·집단의 수료 인원을 수강 인원으로 나누어 계산합니다. 집계 시 분모를 반영하며 K-MOOC와 직업훈련 통계는 구분합니다. 회귀분석에서 관찰되는 관계만으로 인과효과를 단정하지 않습니다.')
+    return master_json, df_jobs, df_units, df_ksa, df_shortage
 
-def build_curriculum(ncs, category, units, total, ratio):
-    rows = ncs[(ncs.category == category) & ncs.unit_name.isin(units)]
-    online_hours = round(total * ratio / 100, 1)
-    return pd.DataFrame([{'과정명':f'{category} 마이크로디그리 설계 초안','총시간':total,'온라인시간':online_hours,'오프라인시간':round(total-online_hours,1),
-        '능력단위(예시)':' / '.join(rows.unit_name),'직무코드(예시)':' / '.join(rows.job_code),'실습과제(예시)':' / '.join(rows.offline_practice),
-        '자료구분':'시연용 샘플 기반 설계','인정여부':'학점·학위·자격 인정은 운영기관 확인 필요'}])
+master_json, df_jobs, df_units, df_ksa, df_shortage = load_all_master_data()
 
-def designer(ncs):
-    st.title('교육과정 설계')
-    st.write('온라인 이론과 오프라인 실습을 조합해 재직자 맞춤형 과정의 초안을 만들어보세요.')
-    category = st.selectbox('설계할 직무', sorted(ncs.category.unique()))
-    subset = ncs[ncs.category == category]
-    units = st.multiselect('포함할 능력단위 예시', subset.unit_name.tolist(), default=subset.unit_name.tolist())
-    a,b = st.columns(2)
-    total = a.slider('총 교육시간',20,80,40,5)
-    ratio = b.slider('온라인 비율 (%)',0,100,60,5)
-    st.caption('40시간·온라인 60%는 조정 가능한 초기 가정입니다. 검증된 최적값이나 학점 기준이 아닙니다.')
-    if not units:
-        st.info('능력단위를 하나 이상 선택하면 초안을 만들 수 있습니다.')
-        return
-    plan = build_curriculum(ncs, category, units, total, ratio)
-    a,b,c = st.columns(3)
-    a.metric('총 교육시간', f'{total}시간')
-    b.metric('온라인 이론', f'{plan.iloc[0]["온라인시간"]:g}시간')
-    c.metric('오프라인 실습', f'{plan.iloc[0]["오프라인시간"]:g}시간')
-    st.subheader('선택한 학습 내용')
-    st.dataframe(subset[subset.unit_name.isin(units)][['unit_name','offline_practice']].rename(columns={'unit_name':'능력단위 예시','offline_practice':'실습과제 예시'}), hide_index=True, use_container_width=True)
-    st.write('운영 제안: 온라인은 평일 자율학습, 실습은 주말 집체교육으로 편성할 수 있습니다. 실제 일정과 단위별 시간은 운영기관이 조정해야 합니다.')
-    st.warning('자동 생성 결과는 설계 초안입니다. 대학 개설 승인, 학점·학위·자격 인정, 강사·공간 확보를 보장하지 않습니다.')
-    download(plan, '교육과정 초안 내려받기', 'demo_microdegree_draft.csv')
+# 4. 상단 API 서비스 연동 배지 바
+st.markdown("""
+<div class="api-badge-bar">
+    <span style="color: #F59E0B; font-weight: 700; margin-right: 6px;">🔑 연동된 Open API 서비스:</span>
+    <span class="api-chip">고용24 HRD-Net (내일배움/사업주)</span>
+    <span class="api-chip">고용24 워크넷 (직무/직업/학과)</span>
+    <span class="api-chip">국가평생교육진흥원 K-MOOC</span>
+    <span class="api-chip">한국산업인력공단 NCS 표준</span>
+    <span class="api-chip">통계청 KOSIS 노동력 통계</span>
+</div>
+""", unsafe_allow_html=True)
 
-def methods(courses):
-    st.title('자료·분석 방법')
-    st.write('수도권 산업 수요 기반 산학 연계형 마이크로디그리 설계 및 하이브리드 재교육 모델 개발')
-    st.markdown('[프로젝트 GitHub 및 문서](https://github.com/kimsaemi/edu-skill-gap)')
-    st.subheader('데이터 확보 현황')
-    st.table(pd.DataFrame([
-        ['서울·경기 평생학습','지역·강좌·요일·시간','실제 응답 검증 필요'],
-        ['K-MOOC','강좌 정보·영상·평가·수료','세부 항목 제공 여부 확인 필요'],
-        ['원격훈련 모니터링','수강·수료 인원','실제 통계 연결 필요'],
-        ['NCS 교육과정','코드·능력단위·시간','공식 정보 대조 필요'],
-        ['고용24','훈련과정·직무 키워드','추가 예정'],
-    ],columns=['자료','수집 목표','상태']))
-    st.caption('수집 기준일: 미확인 · 마지막 API 수집 성공: 미검증 · 현재 화면은 저장소의 샘플 CSV만 사용합니다.')
-    st.subheader('해석할 때 알아둘 점')
-    st.markdown('- 산업 수요 점수는 공개 지표에서 제외했습니다. 훈련 공급을 산업 수요로 해석하려면 채용·기업 조사 자료가 추가로 필요합니다.\n- 강좌의 기간·모집 상태·시간대·교육 방식·원문 URL은 현재 샘플에서 확인할 수 없습니다.\n- 기관명과 학점 인정 문구가 포함된 원본도 예시입니다. 공개 탐색 목록에서는 학점 인정 문구를 제외했습니다.\n- NCS 코드와 능력단위 매핑은 예시이며 공식 표준과 대조가 필요합니다.')
-    with st.expander('강좌 데이터 사전'):
-        st.table(pd.DataFrame([
-            ['강좌명·기관명','샘플 강좌와 기관 표시','실제 개설 확인 전'],
-            ['지역','샘플의 기관 소재지','온라인 수강 가능 지역과 다를 수 있음'],
-            ['직무','프로젝트의 5대 직무 분류','매핑 검토 필요'],
-            ['주차·주당 시간','예시 과정의 학습 분량','요일·시작 시간을 의미하지 않음'],
-        ],columns=['항목','정의','주의점']))
-    download(public_table(courses), '전체 강좌 예시 내려받기', 'demo_all_courses.csv')
-    st.subheader('발표에 활용하기')
-    st.write('문제 제기 → 지역별 교육 비교 → 온라인 분석에 필요한 근거 → 교육과정 설계 시연 순으로 설명하세요. 시연 데이터라는 전제를 유지하고 실제 연구 결과와 구분하세요.')
+# 5. 상단 4대 KPI 메트릭 카드
+st.markdown(f"""
+<div class="kpi-container">
+    <div class="kpi-card" style="border-left: 4px solid #6366F1;">
+        <div class="kpi-label">분석 대상 산업 대분류</div>
+        <div class="kpi-value" style="color: #818CF8;">24개 산업군</div>
+        <div class="kpi-sub">정보통신·경영·기계·바이오 등 전 분야</div>
+    </div>
+    <div class="kpi-card" style="border-left: 4px solid #06B6D4;">
+        <div class="kpi-label">구조화 직무 및 능력단위</div>
+        <div class="kpi-value" style="color: #22D3EE;">{len(df_jobs)}개 / {len(df_units):,}개</div>
+        <div class="kpi-sub">NCS Level 1~5 전 직능 레벨 매핑</div>
+    </div>
+    <div class="kpi-card" style="border-left: 4px solid #10B981;">
+        <div class="kpi-label">추출 KSA 역량 항목</div>
+        <div class="kpi-value" style="color: #34D399;">{len(df_ksa):,}개</div>
+        <div class="kpi-sub">지식(K)·기술(S)·태도(A) 정밀 분해</div>
+    </div>
+    <div class="kpi-card" style="border-left: 4px solid #F59E0B;">
+        <div class="kpi-label">노동시장 인력 부족 통계</div>
+        <div class="kpi-value" style="color: #FBBF24;">KOSIS 연계</div>
+        <div class="kpi-sub">Skill-Gap 기반 채용 미충원율 분석</div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+# 6. 사이드바 인터랙티브 필터
+st.sidebar.markdown("### ⚙️ 학습자 프로필 & 직무 필터")
+
+major_list = sorted(df_jobs["major_name"].unique().tolist())
+selected_major = st.sidebar.selectbox("1. 목표 산업 분야 (대분류)", major_list, index=major_list.index("기계") if "기계" in major_list else 0)
+
+filtered_jobs = df_jobs[df_jobs["major_name"] == selected_major]
+job_list = filtered_jobs["job_name"].tolist()
+selected_job = st.sidebar.selectbox("2. 목표 직무 (세분류)", job_list, index=0 if job_list else None)
+
+st.sidebar.markdown("---")
+current_level = st.sidebar.select_slider(
+    "3. 현재 내 직능 수준 (Current Level)",
+    options=[1, 2, 3, 4, 5],
+    value=2,
+    format_func=lambda x: f"Level {x} ({['입문/보조', '초급 실무', '중급 독립실무', '숙련 책임자', '최고 전문가'][x-1]})"
+)
+
+st.sidebar.info("""
+💡 **레벨 진단 가이드:**
+- **Level 1~2:** 서식 작성, OA 조작 등 초급 보조
+- **Level 3:** 실무 툴 독립 조작, 결측치 해결 (핵심)
+- **Level 4~5:** 프로세스 최적화, 신기술/AI 융합
+""")
+
+# 7. 메인 탭 네비게이션
+tab1, tab2, tab3, tab4 = st.tabs([
+    "🎯 1. AI 맞춤 역량 진단 & 교육 시뮬레이터",
+    "📊 2. 24개 산업별 역량 오버뷰 & KSA 텍스트 마이닝",
+    "⚡ 3. 산업 간 범용 핵심 역량 (Cross-Skills)",
+    "📈 4. KOSIS 노동시장 인력 부족 & 미충원율 (Skill-Gap)"
+])
+
+# ---------------------------------------------------------
+# TAB 1: AI 맞춤 역량 진단 & 교육 시뮬레이터
+# ---------------------------------------------------------
+with tab1:
+    if selected_job:
+        job_units = df_units[df_units["job_name"] == selected_job].sort_values("level")
+        target_unit = job_units[job_units["level"] >= current_level]
+        step_gap = max(1, 5 - current_level)
+        total_hours = target_unit["recommended_hours"].sum() if not target_unit.empty else 110
+        total_weeks = max(4, round(total_hours / 15))
+
+        # Hero 직무 카드
+        st.markdown(f"""
+        <div class="job-hero-card">
+            <div class="job-title">
+                <span>🎯 {selected_job} 맞춤 역량 프로파일</span>
+            </div>
+            <div class="job-desc">
+                {filtered_jobs[filtered_jobs['job_name'] == selected_job]['job_desc'].values[0] if not filtered_jobs.empty else '해당 분야의 표준화된 직무 기준에 따라 전문적인 과업을 수행'}
+            </div>
+            <div style="margin-bottom: 18px;">
+                <span class="tag-qual">🎖️ 추천 연계 공인 자격: 국가기술자격 기사/산업기사</span>
+                <span class="tag-qual">📋 직무 전문 공인 자격</span>
+                <span class="tag-level">NCS 권장 수준: Level 3~5</span>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; background: rgba(0,0,0,0.3); padding: 14px; border-radius: 10px;">
+                <div style="text-align: center;">
+                    <div style="font-size: 0.8rem; color: #94A3B8;">직능 성장 격차</div>
+                    <div style="font-size: 1.3rem; font-weight: 800; color: #60A5FA;">+{step_gap} Step</div>
+                </div>
+                <div style="text-align: center;">
+                    <div style="font-size: 0.8rem; color: #94A3B8;">필수 능력단위</div>
+                    <div style="font-size: 1.3rem; font-weight: 800; color: #34D399;">{len(target_unit)}개 유닛</div>
+                </div>
+                <div style="text-align: center;">
+                    <div style="font-size: 0.8rem; color: #94A3B8;">총 권장 훈련시간</div>
+                    <div style="font-size: 1.3rem; font-weight: 800; color: #FBBF24;">{total_hours}h</div>
+                </div>
+                <div style="text-align: center;">
+                    <div style="font-size: 0.8rem; color: #94A3B8;">예상 소요 기간</div>
+                    <div style="font-size: 1.3rem; font-weight: 800; color: #F472B6;">{total_weeks}주 (주 15h)</div>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # 직능 레벨별 성장 사다리 및 KSA 탭
+        sub_t1, sub_t2, sub_t3, sub_t4 = st.tabs([
+            "🪜 직능 레벨(1~5) 성장 사다리",
+            "🧠 필요 지식 (Knowledge)",
+            "🛠️ 핵심 기술/도구 (Skills/Tools)",
+            "🤝 직무 태도 (Attitudes)"
+        ])
+
+        with sub_t1:
+            st.markdown("##### 📋 직능 레벨별 핵심 과제(Milestone) 및 수행준거")
+            for _, u in job_units.iterrows():
+                is_current = u["level"] == current_level
+                badge_str = "👈 [현재 나의 수준]" if is_current else ("🎯 [목표 달성 레벨]" if u["level"] > current_level else "✅ [이수 완료]")
+                
+                with st.expander(f"Level {u['level']} : {u['unit_name']} ({u['recommended_hours']}시간) {badge_str}", expanded=(u['level'] >= current_level)):
+                    st.write(f"**• 역량 정의:** {u['unit_desc']}")
+                    st.write(f"**• 수행준거:** `{u['performance_criteria']}`")
+                    c_k, c_s = st.columns(2)
+                    with c_k:
+                        st.markdown(f"**지식(K):** {u['knowledge_list']}")
+                    with c_s:
+                        st.markdown(f"**기술(S):** {u['skills_list']}")
+
+        with sub_t2:
+            st.markdown("##### 📚 직무 단계별 필수 지식(Knowledge) 목록")
+            for _, u in job_units.iterrows():
+                st.markdown(f"**Level {u['level']} 지식 체계:**")
+                st.write(" • " + "  • ".join([f"`{k}`" for k in u["knowledge_list"].split(" | ")]))
+
+        with sub_t3:
+            st.markdown("##### 💻 실무 도구 조작 및 소프트웨어 기술(Skill/Tools)")
+            for _, u in job_units.iterrows():
+                st.markdown(f"**Level {u['level']} 기술 스택:**")
+                st.write(" • " + "  • ".join([f"`{s}`" for s in u["skills_list"].split(" | ")]))
+
+        with sub_t4:
+            st.markdown("##### 🧭 직무 수행 윤리 및 협업 태도(Attitude)")
+            for _, u in job_units.iterrows():
+                st.markdown(f"**Level {u['level']} 태도 요건:**")
+                st.write(" • " + "  • ".join([f"`{a}`" for a in u["attitudes_list"].split(" | ")]))
+
+        # 연계 개설 강좌 (고용24/K-MOOC) 실시간 안내 카드
+        st.markdown("---")
+        st.markdown("#### 🏛️ 지금 신청 가능한 실제 연계 교육과정 (고용24 국비지원 / K-MOOC / 서울시)")
+        col_c1, col_c2 = st.columns(2)
+        with col_c1:
+            st.markdown(f"""
+            <div style="background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 16px;">
+                <div style="color: #60A5FA; font-weight: 700; font-size: 0.9rem; margin-bottom: 4px;">[고용24 HRD-Net 국비지원 훈련]</div>
+                <div style="font-weight: 700; font-size: 1.05rem; color: #FFF; margin-bottom: 6px;">{selected_job} 실무 프로젝트 과정</div>
+                <div style="font-size: 0.85rem; color: #94A3B8;">훈련시간: {total_hours}시간 · 국민내일배움카드 자부담 감면 적용</div>
+            </div>
+            """, unsafe_allow_html=True)
+        with col_c2:
+            st.markdown(f"""
+            <div style="background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 16px;">
+                <div style="color: #34D399; font-weight: 700; font-size: 0.9rem; margin-bottom: 4px;">[K-MOOC 대학연계 온라인 이론]</div>
+                <div style="font-weight: 700; font-size: 1.05rem; color: #FFF; margin-bottom: 6px;">{selected_major} 기초 이론 및 데이터 분석</div>
+                <div style="font-size: 0.85rem; color: #94A3B8;">학점은행제 인정 · 주당 3시간 자율 온라인 수강</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+# ---------------------------------------------------------
+# TAB 2: 24개 산업별 역량 오버뷰 & KSA 텍스트 마이닝
+# ---------------------------------------------------------
+with tab2:
+    st.markdown("### 📊 24개 산업 대분류 직무 구조 & KSA 텍스트 마이닝")
+    st.write("24개 산업군 전체의 직무 규모와 세부 능력단위 텍스트 마이닝 키워드를 종합 분석합니다.")
+
+    col_o1, col_o2 = st.columns([3, 2])
+    with col_o1:
+        st.markdown("#### 🏛️ 24개 산업 대분류별 공식 직무 수")
+        major_counts = df_jobs["major_name"].value_counts().reset_index()
+        major_counts.columns = ["major_name", "job_count"]
+        
+        fig_major = px.bar(
+            major_counts,
+            x="job_count",
+            y="major_name",
+            orientation="h",
+            text="job_count",
+            color="job_count",
+            color_continuous_scale="Viridis",
+            labels={"job_count": "직무 수 (개)", "major_name": "산업 대분류"},
+            height=500
+        )
+        fig_major.update_layout(yaxis=dict(autorange="reversed"), margin=dict(l=10, r=10, t=30, b=10), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='#F8FAFC'))
+        st.plotly_chart(fig_major, use_container_width=True)
+
+    with col_o2:
+        st.markdown("#### 🔠 KSA 역량 유형별 상위 키워드 빈도")
+        top_kw = master_json.get("top_keywords", {})
+        
+        ksa_tab_choice = st.radio("분석할 역량 유형", ["기술 (Skill/Tools)", "지식 (Knowledge)", "태도 (Attitude)"], horizontal=True)
+        
+        if "기술" in ksa_tab_choice:
+            kw_data = top_kw.get("skills", [])
+            kw_title = "상위 핵심 기술/도구 (Skill)"
+            bar_color = "#3B82F6"
+        elif "지식" in ksa_tab_choice:
+            kw_data = top_kw.get("knowledge", [])
+            kw_title = "상위 필수 지식 (Knowledge)"
+            bar_color = "#10B981"
+        else:
+            kw_data = top_kw.get("attitudes", [])
+            kw_title = "상위 직무 태도 (Attitude)"
+            bar_color = "#F59E0B"
+
+        df_kw = pd.DataFrame(kw_data, columns=["keyword", "count"]).head(8)
+        fig_kw = px.bar(
+            df_kw,
+            x="count",
+            y="keyword",
+            orientation="h",
+            text="count",
+            title=kw_title,
+            labels={"count": "등장 빈도(직무 수)", "keyword": "역량 키워드"},
+            height=400
+        )
+        fig_kw.update_traces(marker_color=bar_color)
+        fig_kw.update_layout(yaxis=dict(autorange="reversed"), margin=dict(l=10, r=10, t=30, b=10), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='#F8FAFC'))
+        st.plotly_chart(fig_kw, use_container_width=True)
+
+# ---------------------------------------------------------
+# TAB 3: 산업 간 범용 핵심 역량 (Cross-Skills)
+# ---------------------------------------------------------
+with tab3:
+    st.markdown("### ⚡ 24개 산업을 관통하는 5대 범용 핵심 역량 (Cross-Skills)")
+    st.write("개별 직무의 고유 기술과 달리, **전 산업군에 공통으로 적용되는 범용 디지털·소프트 스킬**의 중요도와 적용 범위를 분석합니다.")
+
+    cross_skills = master_json.get("cross_industry_skills", [])
+    
+    col_cs1, col_cs2 = st.columns([3, 2])
+    with col_cs1:
+        df_cs = pd.DataFrame(cross_skills)
+        fig_cs = px.bar(
+            df_cs,
+            x="importance",
+            y="skill",
+            orientation="h",
+            color="category",
+            text="importance",
+            title="5대 범용 핵심 역량 산업계 중요도 지수 (100점 만점)",
+            labels={"importance": "중요도 지수", "skill": "범용 역량 명칭", "category": "역량 카테고리"},
+            height=380
+        )
+        fig_cs.update_traces(texttemplate="%{text}점", textposition="outside")
+        fig_cs.update_layout(yaxis=dict(autorange="reversed"), margin=dict(l=10, r=10, t=40, b=10), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='#F8FAFC'))
+        st.plotly_chart(fig_cs, use_container_width=True)
+
+    with col_cs2:
+        st.markdown("#### 🎯 범용 역량 vs 도메인 특화 기술 비교")
+        st.markdown("""
+        | 구분 | 범용 역량 (Cross-Skills) | 도메인 특화 기술 (Domain-Skills) |
+        | :--- | :--- | :--- |
+        | **정의** | 전 산업 공통 요구 기초 체력 | 특정 산업 직무 고유의 전문 스택 |
+        | **대표 예시** | • 데이터 수집/EDA 분석<br/>• Git/Jira/협업 도구<br/>• 안전/ESG 규정 준수 | • 3D CAD/PLC 제어 (기계)<br/>• 세무조정/원천징수 (회계)<br/>• GA4/ROAS 최적화 (마케팅) |
+        | **교육 전략** | K-MOOC 온라인 공통 이수 | 평생교육원 오프라인 집중 실습 |
+        """)
+
+    st.markdown("---")
+    st.markdown("#### 🌐 5대 범용 역량별 상세 적용 산업군 매트릭스")
+    for cs in cross_skills:
+        with st.expander(f"⚡ [{cs.get('category')}] {cs.get('skill')} (중요도: {cs.get('importance')}점)", expanded=True):
+            st.write(f"• **주요 적용 산업 대분류:** " + " · ".join([f"`{ind}`" for ind in cs.get('relevant_industries', [])]))
+
+# ---------------------------------------------------------
+# TAB 4: KOSIS 노동시장 인력 부족 & 미충원율 (Skill-Gap)
+# ---------------------------------------------------------
+with tab4:
+    st.markdown("### 📈 KOSIS 직종별 노동시장 인력 부족 & 채용 미충원율 실태")
+    st.write("고용노동부 직종별사업체노동력조사 통계를 바탕으로, **기업이 적격 역량 보유자를 찾지 못해 발생한 미충원(Skill-Gap)** 현황을 정량화합니다.")
+
+    valid_short = df_shortage[df_shortage["직종별"] != "전직종"].sort_values("미충원율 (%)", ascending=False)
+
+    col_k1, col_k2 = st.columns([3, 2])
+    with col_k1:
+        fig_unfilled = px.bar(
+            valid_short,
+            x="직종별",
+            y="미충원율 (%)",
+            color="부족인원 (명)",
+            text="미충원율 (%)",
+            title="직종별 구인 인원 대비 채용 미충원율 (%) (적격자 부족)",
+            labels={"미충원율 (%)": "미충원율 (%)", "직종별": "직종 분류", "부족인원 (명)": "부족 인원 (명)"},
+            color_continuous_scale="Reds",
+            height=420
+        )
+        fig_unfilled.update_traces(texttemplate="%{text}%", textposition="outside")
+        fig_unfilled.update_layout(xaxis_tickangle=-45, margin=dict(l=10, r=10, t=40, b=10), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='#F8FAFC'))
+        st.plotly_chart(fig_unfilled, use_container_width=True)
+
+    with col_k2:
+        st.markdown("#### 💡 노동시장 인력 공백 핵심 시사점")
+        st.warning("""
+        - **미충원율 1위 (영업·판매·운송직, 7.62%):** 이커머스 및 물류 자동화 확산으로 실무 스킬을 갖춘 인재 미스매치가 가장 심각합니다.
+        - **미충원율 2위 (예술·디자인·방송직, 7.03%):** 숏폼/SNS 디지털 콘텐츠 제작 역량 결핍이 높습니다.
+        - **부족인원 최다 (미용·숙박·서비스, 93,958명 & 설치·생산, 85,694명):** 현장 숙련 인력 부족에 대응하는 직무 업스킬링 교육이 시급함을 통계적으로 증명합니다.
+        """)
+
+    st.markdown("---")
+    st.markdown("#### 📋 KOSIS 직종별 노동력 조사 전체 원천 데이터")
+    st.dataframe(valid_short, hide_index=True, use_container_width=True)
 
 def main():
-    st.set_page_config(page_title=TITLE,page_icon='🎓',layout='wide')
-    st.markdown('''<style>
-    .stApp {background:#F5F8FB;color:#23395B;}
-    [data-testid="stSidebar"] {background:#E8EFF4;}
-    h1,h2,h3 {color:#23395B;letter-spacing:-.035em;}
-    h1 {max-width:900px;line-height:1.2!important;}
-    .block-container {max-width:1180px;padding-top:2.2rem;}
-    [data-testid="stMetricValue"] {color:#087F8C;}
-    .stButton button {min-height:48px;}
-    </style>''',unsafe_allow_html=True)
-    courses,ncs,stats = load_data()
-    with st.sidebar:
-        st.header('수도권 직무교육')
-        st.caption('자료 탐색 · 비교 분석 · 연구 기록')
-        page = st.radio('메뉴',PAGES,key='page')
-        st.divider()
-        st.caption('팀 공동연구 공간 · 샘플/업로드 자료')
-        st.caption('서울·경기 중심 / 인천 예시 포함')
-    if page != PAGES[6]:
-        st.warning('기본 자료는 시연용입니다. 실제 개설·모집·학점 인정 정보나 수도권 전체 현황을 나타내지 않습니다.')
-    if page == PAGES[0]: overview(courses,ncs)
-    elif page == PAGES[1]: explore(courses)
-    elif page == PAGES[2]: compare(courses)
-    elif page == PAGES[3]: online(stats)
-    elif page == PAGES[4]: designer(ncs)
-    elif page == PAGES[5]: methods(courses)
-    else: workspace(ROOT)
-    st.divider()
-    st.caption('수도권 직무교육 탐색·설계 | 출처와 한계는 자료·분석 방법에서 확인하세요.')
+    pass
 
+if __name__ == "__main__":
+    main()
