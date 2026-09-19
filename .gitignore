@@ -40,7 +40,6 @@ ENV/
 
 # Data cache (대용량 수집 데이터 및 로컬 DB)
 data/raw/
-data/processed/
 *.sqlite
 *.db
 
