@@ -7,6 +7,10 @@ import plotly.express as px
 import streamlit as st
 
 SOURCES = {
+    'NCS 272개 직무 마스터 (추출)': '../processed/ncs_272_jobs.csv',
+    'NCS 1,360개 능력단위 (추출)': '../processed/ncs_1360_units.csv',
+    'NCS KSA 지식·기술·태도 마스터 (추출)': '../processed/ncs_ksa_master.csv',
+    'KOSIS 직종별 노동력 부족 통계': 'occupation_labor_shortage.csv',
     '강좌 통합 샘플': 'kmooc_courses.csv',
     'NCS 교육과정 샘플': 'ncs_curriculums.csv',
     '원격훈련 통계 샘플': 'remote_learning_stats.csv',
