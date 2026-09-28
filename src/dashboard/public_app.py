@@ -247,9 +247,16 @@ def load_all_master_data():
     df_shortage.columns = [c.strip() for c in df_shortage.columns]
     df_shortage["미충원율 (%)"] = (df_shortage["미충원인원 (명)"] / df_shortage["구인인원 (명)"] * 100).round(2)
 
-    return master_json, df_jobs, df_units, df_ksa, df_shortage
+    # 4. 24대 교육 플랫폼 연계 강좌 (인프런 크롤링 포함)
+    courses_file = PROCESSED_DIR / "multi_platform_courses.csv"
+    if courses_file.exists():
+        df_courses = pd.read_csv(courses_file)
+    else:
+        df_courses = pd.DataFrame()
 
-master_json, df_jobs, df_units, df_ksa, df_shortage = load_all_master_data()
+    return master_json, df_jobs, df_units, df_ksa, df_shortage, df_courses
+
+master_json, df_jobs, df_units, df_ksa, df_shortage, df_courses = load_all_master_data()
 
 # 4. 상단 헤더 렌더링
 st.markdown("""
@@ -450,26 +457,41 @@ with tab1:
                     st.markdown(f"**🛠️ 핵심 기술(S/Tools):** {u['skills_list']}")
                     st.markdown(f"**🤝 직무 태도(A):** {u['attitudes_list']}")
 
-        # 4. 실제 개설 강좌 연계 카드
+        # 4. 24개 플랫폼 연계 강좌 (인프런 실시간 크롤링 + STEP + K-MOOC + HRD-Net + KPC)
         st.markdown("---")
-        st.markdown("### 🏛️ 지금 신청 가능한 실제 개설 강좌 (고용24 국비지원 / K-MOOC / 서울시 평생학습)")
-        c_l, c_r = st.columns(2)
-        with c_l:
-            st.markdown(f"""
-            <div style="background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 12px; padding: 18px;">
-                <span style="color: #60A5FA; font-weight: 700; font-size: 0.85rem;">[고용24 국비지원 HRD-Net]</span>
-                <div style="font-size: 1.05rem; font-weight: 800; color: #FFF; margin: 6px 0;">{selected_job_name} 실무 핵심 마스터 과정</div>
-                <div style="font-size: 0.82rem; color: #94A3B8;">국민내일배움카드 자부담 감면 · 총 {total_hours}시간 편성 · 실전 프로젝트 포함</div>
-            </div>
-            """, unsafe_allow_html=True)
-        with c_r:
-            st.markdown(f"""
-            <div style="background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 12px; padding: 18px;">
-                <span style="color: #34D399; font-weight: 700; font-size: 0.85rem;">[K-MOOC 대학연계 온라인 이론]</span>
-                <div style="font-size: 1.05rem; font-weight: 800; color: #FFF; margin: 6px 0;">{selected_major_name} 기초 이론 및 데이터 분석</div>
-                <div style="font-size: 0.82rem; color: #94A3B8;">학점은행제 인정 과정 · 주당 3시간 자율 온라인 수강 · 대학 교수진 직강</div>
-            </div>
-            """, unsafe_allow_html=True)
+        st.markdown("### 🏛️ 지금 신청 가능한 교육 데이터 연계 강좌 (인프런 · STEP · K-MOOC · 고용24)")
+        
+        if not df_courses.empty:
+            # Filter or match by current major or keywords
+            matched_c = df_courses[
+                df_courses["matched_ncs_industry"].str.contains(selected_major_name, case=False, na=False) |
+                df_courses["matched_ncs_industry"].str.contains(selected_major_name[:2], case=False, na=False)
+            ]
+            if matched_c.empty:
+                matched_c = df_courses.head(6)
+                
+            cols = st.columns(3)
+            for idx, (_, row) in enumerate(matched_c.head(6).iterrows()):
+                col = cols[idx % 3]
+                with col:
+                    platform_badge = row.get("platform", "온라인 강좌")
+                    badge_color = "#3B82F6" if "인프런" in platform_badge else ("#10B981" if "STEP" in platform_badge or "K-MOOC" in platform_badge else "#F59E0B")
+                    st.markdown(f"""
+                    <div style="background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255,255,255,0.1); border-top: 3px solid {badge_color}; border-radius: 12px; padding: 16px; margin-bottom: 12px; min-height: 180px; display: flex; flex-direction: column; justify-content: space-between;">
+                        <div>
+                            <span style="background: rgba(255,255,255,0.08); color: {badge_color}; font-size: 0.75rem; padding: 2px 8px; border-radius: 4px; font-weight: 700;">{platform_badge}</span>
+                            <div style="font-size: 0.95rem; font-weight: 800; color: #FFF; margin: 8px 0 4px 0; line-height: 1.35;">{row.get('course_title', '')[:40]}</div>
+                            <div style="font-size: 0.78rem; color: #94A3B8;">강사/기관: {row.get('provider_or_instructor', '전문 교수진')}</div>
+                            <div style="font-size: 0.75rem; color: #38BDF8; margin-top: 4px;">스택: {row.get('tech_stack_tags', '-')}</div>
+                        </div>
+                        <div style="margin-top: 10px; display: flex; justify-content: space-between; align-items: center;">
+                            <span style="font-size: 0.75rem; color: #FCD34D;">{row.get('cost_type', '수강 가능')}</span>
+                            <a href="{row.get('course_url', '#')}" target="_blank" style="background: {badge_color}; color: #FFF; padding: 3px 10px; border-radius: 6px; font-size: 0.75rem; text-decoration: none; font-weight: 700;">강의 보러가기 ➔</a>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+        else:
+            st.info("연계 강좌 데이터를 불러오는 중입니다.")
 
 # ---------------------------------------------------------
 # TAB 2: 24개 산업별 직무 통계 오버뷰
