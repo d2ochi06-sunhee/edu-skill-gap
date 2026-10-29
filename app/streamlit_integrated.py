@@ -1,8 +1,8 @@
 """
-NCS 기반 인사·총무·경영지원 교육 추천 및 분석 시스템 — 통합 대시보드
+NCS 기반 인사 교육 추천 및 분석 시스템 — 통합 대시보드
 - 실행 명령어: streamlit run app/streamlit_integrated.py
 - 데이터 소스:
-    1. 통합 정제 데이터셋 (8,645건): data/hr/processed/education_courses_search_cleaned.parquet
+    1. 통합 정제 데이터셋 (9,089건): data/hr/processed/education_courses_search_cleaned.parquet
     2. STEP 4 기존 표본 (553건/295건): data/hr/output/integration/hr_integrated_candidates.csv
     3. 사전 토큰화 캐시: data/hr/processed/tokenized_corpus_cache.parquet
     4. 키워드 분석 결과: data/hr/output/recommendation/course_tfidf_keywords.csv
@@ -286,17 +286,17 @@ DATA_RECOM = WORKSPACE_ROOT / "data" / "hr" / "output" / "recommendation"
 # ------------------------------------------------------------------------------
 # 1. 데이터셋 로딩 및 캐싱
 # ------------------------------------------------------------------------------
-@st.cache_resource(show_spinner="Ko-SRoBERTa 딥러닝 임베딩 엔진(8,645건) 초기화 중...")
+@st.cache_resource(show_spinner="Ko-SRoBERTa 딥러닝 임베딩 엔진(9,089건) 초기화 중...")
 def load_deeplearning_embeddings():
     """
-    8,645건 Ko-SRoBERTa 768차원 전수 임베딩 및 모델 로드 (@st.cache_resource)
-    - 딥러닝 임베딩 행렬(8645, 768)을 메모리에 상주시켜 지연 없이 즉각 로드 및 실시간 코사인 유사도 검색을 제공합니다.
+    9,089건 Ko-SRoBERTa 768차원 전수 임베딩 및 모델 로드 (@st.cache_resource)
+    - 딥러닝 임베딩 행렬(9089, 768)을 메모리에 상주시켜 지연 없이 즉각 로드 및 실시간 코사인 유사도 검색을 제공합니다.
     """
     emb_path = DATA_RECOM / "embeddings_ko_sroberta_all.npy"
     if not emb_path.exists():
         return None, None
     
-    # 8,645 x 768 임베딩 벡터 로드
+    # 9,089 x 768 임베딩 벡터 로드
     embeddings = np.load(emb_path)
     
     import torch
@@ -314,13 +314,18 @@ def get_unified_recommender():
 
 @st.cache_data(show_spinner=False)
 def load_main_datasets():
-    """정제된 8,645건 교육 코퍼스 및 분석 결과 파일들을 로드합니다."""
-    # 1. 메인 8,645건 정제 데이터셋
+    """정제된 9,089건 교육 코퍼스 및 분석 결과 파일들을 로드합니다."""
+    # 1. 메인 9,089건 정제 데이터셋
     df_main = pd.read_parquet(DATA_PROCESSED / "education_courses_search_cleaned.parquet")
     
     # 숫자형 처리
     df_main["duration_hours"] = pd.to_numeric(df_main["duration_hours"], errors="coerce")
     df_main["price"] = pd.to_numeric(df_main["price"], errors="coerce")
+
+    # 2026-10-28 팀 결정: 총무·무관·법정안전·마케팅 과정은 검색·추천 대상에서 제외
+    p_excl = DATA_PROCESSED / "off_topic_exclusions.csv"
+    excluded_uids = set(pd.read_csv(p_excl, encoding="utf-8-sig")["course_uid"]) if p_excl.exists() else set()
+    df_main["is_excluded"] = df_main["course_uid"].isin(excluded_uids)
     
     # 2. STEP 4 기초 표본 데이터셋 (553건)
     p_step4 = DATA_INTEG / "hr_integrated_candidates.csv"
@@ -497,6 +502,9 @@ def load_interactive_search_engine():
         return None, None, None, None, None
         
     df_main_corpus = pd.read_parquet(main_path)
+    p_excl = DATA_PROCESSED / "off_topic_exclusions.csv"
+    excluded_uids = set(pd.read_csv(p_excl, encoding="utf-8-sig")["course_uid"]) if p_excl.exists() else set()
+    df_main_corpus["is_excluded"] = df_main_corpus["course_uid"].isin(excluded_uids)
     df_cache = pd.read_parquet(cache_path)
 
     # UID 순서 일치 무결성 검증 및 재정렬
@@ -527,6 +535,7 @@ with st.sidebar:
     
     st.markdown("### 📌 코퍼스 핵심 요약")
     st.metric("총 분석 코퍼스", f"{len(df_main):,}건")
+    st.metric("검색·추천 대상 (제외 목록 반영)", f"{int((~df_main['is_excluded']).sum()):,}건")
     st.metric("수집 교육기관", f"{df_main['provider'].nunique()}개 기관")
     
     rich_cnt = (df_main["text_quality_status"] == "RICH").sum()
@@ -560,13 +569,13 @@ st.markdown("""
   <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
     <div>
       <span style="background: rgba(99, 102, 241, 0.25); color: #C7D2FE; padding: 0.3rem 0.85rem; border-radius: 20px; font-size: 0.8rem; font-weight: 700; border: 1px solid rgba(199, 210, 254, 0.35); letter-spacing: 0.02em;">🏛️ NCS & KSA AI-POWERED HR INTELLIGENCE</span>
-      <h1 style="color: #FFFFFF; font-size: 1.95rem; font-weight: 800; margin: 0.65rem 0 0.45rem 0; letter-spacing: -0.025em; line-height: 1.25;">NCS 기반 인사·총무 맞춤형 교육과정 통합 대시보드</h1>
+      <h1 style="color: #FFFFFF; font-size: 1.95rem; font-weight: 800; margin: 0.65rem 0 0.45rem 0; letter-spacing: -0.025em; line-height: 1.25;">NCS 기반 인사 맞춤형 교육과정 통합 대시보드</h1>
       <p style="color: #94A3B8; margin: 0; font-size: 0.94rem; font-weight: 400; max-width: 950px; line-height: 1.55;">
-        8,645건 통합 교육 코퍼스 대상 Ko-SRoBERTa 딥러닝 시맨틱 검색, K-Means 10대 직무 군집화 및 크로스 플랫폼 스마트 하이브리드 추천 엔진
+        9,089건 통합 교육 코퍼스 대상 Ko-SRoBERTa 딥러닝 시맨틱 검색, K-Means 10대 직무 군집화 및 크로스 플랫폼 스마트 하이브리드 추천 엔진
       </p>
     </div>
     <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
-      <span style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.18); padding: 0.55rem 1.05rem; border-radius: 10px; font-size: 0.85rem; font-weight: 600; color: #F8FAFC;">📚 코퍼스 8,645건</span>
+      <span style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.18); padding: 0.55rem 1.05rem; border-radius: 10px; font-size: 0.85rem; font-weight: 600; color: #F8FAFC;">📚 코퍼스 9,089건</span>
       <span style="background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.35); padding: 0.55rem 1.05rem; border-radius: 10px; font-size: 0.85rem; font-weight: 600; color: #34D399;">⚡ Ko-SRoBERTa 768D</span>
     </div>
   </div>
@@ -593,7 +602,7 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11, tab12, tab13
 # 탭 1: 교육 데이터 현황
 # ------------------------------------------------------------------------------
 with tab1:
-    st.subheader("📊 전체 8,645건 교육과정 데이터 현황")
+    st.subheader("📊 전체 9,089건 교육과정 데이터 현황")
     st.caption("통합 교육 데이터의 기관별 분포, 직무 카테고리, 교육 시간 및 비용, 텍스트 결측 현황을 파악합니다.")
 
     # 1. 상단 핵심 KPI
@@ -753,7 +762,7 @@ with tab1:
 # ------------------------------------------------------------------------------
 with tab2:
     st.subheader("📈 다차원 EDA 분석 및 데이터 범위 비교")
-    st.caption("기존 STEP 4의 295건 표본과 신규 8,645건 통합 데이터셋의 차이를 구분하고 심층 비교합니다.")
+    st.caption("기존 STEP 4의 295건 표본과 신규 9,089건 통합 데이터셋의 차이를 구분하고 심층 비교합니다.")
 
     # 1. 데이터 범위 구분 카드 (Lucian UX/UI 카드 & 오버플로우 방지)
     col_scope1, col_scope2 = st.columns(2)
@@ -774,7 +783,7 @@ with tab2:
         st.markdown("""
         <div style="background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 12px; padding: 1.25rem 1.35rem; height: 100%; box-shadow: var(--ux-card-shadow); box-sizing: border-box;">
           <div style="font-size: 1.02rem; font-weight: 700; color: #15803D; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.4rem;">
-            <span>🚀</span> <span>신규 STEP 5 대규모 통합 범위 (8,645건)</span>
+            <span>🚀</span> <span>신규 STEP 5 대규모 통합 범위 (9,089건)</span>
           </div>
           <ul style="margin: 0; padding-left: 1.2rem; font-size: 0.88rem; color: #1E293B; line-height: 1.65;">
             <li style="margin-bottom: 0.35rem;"><b>데이터 출처</b>: 신규 6대 기관 SQLite DB(8,505건) + 공공 API(140건)</li>
@@ -887,7 +896,7 @@ with tab3:
             names="매핑상태",
             values="과정수",
             hole=0.45,
-            title="8,645건 코퍼스 매핑 상태 비중",
+            title="9,089건 코퍼스 매핑 상태 비중",
             color_discrete_map={
                 "자동 매핑 후보 (규칙 검증)": "#27ae60",
                 "일반 소양 / 직무 외": "#95a5a6",
@@ -962,7 +971,7 @@ with tab4:
 
     # 1. 상위 빈출 핵심 키워드 종합 순위
     if not df_kw.empty:
-        st.markdown("#### 🏆 전체 8,645건 코퍼스에서 가장 많이 등장한 상위 TF-IDF 키워드")
+        st.markdown("#### 🏆 전체 9,089건 코퍼스에서 가장 많이 등장한 상위 TF-IDF 키워드")
         all_kws = []
         for kw_str in df_kw["top_tfidf_keywords"].dropna():
             for k in str(kw_str).split(","):
@@ -1127,7 +1136,7 @@ with tab5:
 
     with subtab_live:
         st.markdown("#### ⚡ 실시간 대화형 검색 (Custom Query Search)")
-        st.caption("사용자가 입력한 검색어를 바탕으로 TF-IDF 및 BM25 검색 엔진이 8,645건 코퍼스를 실시간 검색합니다.")
+        st.caption("사용자가 입력한 검색어를 바탕으로 TF-IDF 및 BM25 검색 엔진이 9,089건 코퍼스를 실시간 검색합니다.")
 
         custom_query = st.text_input("검색어를 입력하세요", placeholder="예: 취업규칙 개정, 엑셀 피벗테이블, 사옥 시설관리, 애자일 스크럼")
         
@@ -1145,6 +1154,7 @@ with tab5:
                     # 1. TF-IDF Search
                     q_vec = vectorizer.transform([" ".join(q_tokens)])
                     sim_scores = cosine_similarity(q_vec, tfidf_matrix).flatten()
+                    sim_scores[df_search_corpus["is_excluded"].values] = 0.0
                     ranked_t = np.argsort(sim_scores)[::-1]
                     
                     # Dedup Top 10
@@ -1159,7 +1169,8 @@ with tab5:
                         if len(seen_t) == 10: break
 
                     # 2. BM25 Search
-                    bm25_scores = bm25.get_scores(q_tokens)
+                    bm25_scores = np.asarray(bm25.get_scores(q_tokens), dtype=float)
+                    bm25_scores[df_search_corpus["is_excluded"].values] = 0.0
                     ranked_b = np.argsort(bm25_scores)[::-1]
                     
                     seen_b = {}
@@ -1264,7 +1275,7 @@ with tab6:
         "1. **비교 대상 모델**: `klue/bert-base` vs `jhgan/ko-sroberta-multitask` (STS 특화 Bi-Encoder)\n"
         "2. **임베딩 파일럿 데이터셋**: 400건 표본 준비 완료 (`data/hr/processed/pilot_courses_embedding_400.parquet`)\n"
         "3. **저장 및 검색 방식**: 768차원 Float32 벡터(`.npy`, 약 25.3MB) 및 FAISS `IndexFlatIP` 초고속 내적 검색\n"
-        "4. **진행 원칙**: 단위 파일럿 테스트를 거친 후 전체 8,645건으로 확장하며, 현재 어휘 검색(TF-IDF·BM25)과 앙상블 하이브리드 검색을 구성합니다."
+        "4. **진행 원칙**: 단위 파일럿 테스트를 거친 후 전체 9,089건으로 확장하며, 현재 어휘 검색(TF-IDF·BM25)과 앙상블 하이브리드 검색을 구성합니다."
     )
 
 # ------------------------------------------------------------------------------
@@ -1300,7 +1311,7 @@ with tab7:
         st.metric("과정당 평균 역량연결", f"{ratio}개", help="1개 과정이 평균 몇 개 역량과 매핑되는지")
     with col5:
         kw_cnt = len(df_kw_long) if not df_kw_long.empty else 0
-        st.metric("TF-IDF 키워드 (Long)", f"{kw_cnt:,}건", "8,645건 전수 매핑")
+        st.metric("TF-IDF 키워드 (Long)", f"{kw_cnt:,}건", "9,089건 전수 매핑")
 
     st.markdown("---")
 
@@ -1517,7 +1528,7 @@ with tab7:
 with tab8:
     st.subheader("🎯 탭 8. K-Means 군집 분석 & 하이브리드 추천 엔진 (Ko-SRoBERTa 768차원 + BM25)")
     st.caption(
-        "팀원(d2ochi06)의 NLP 군집화·추천 프로토타입을 안전하게 검증·재현하고, 통합 코퍼스(8,645건)로 연계 확장하여 "
+        "팀원(d2ochi06)의 NLP 군집화·추천 프로토타입을 안전하게 검증·재현하고, 통합 코퍼스(9,089건)로 연계 확장하여 "
         "다차원 K-Means 군집화와 정규화 및 다회차 중복 제거가 적용된 Ko-SRoBERTa 딥러닝 하이브리드 추천을 제공합니다."
     )
 
@@ -1534,14 +1545,14 @@ with tab8:
     # 상단 데이터셋 선택 토글
     data_mode = st.radio(
         "🔎 분석 대상 데이터셋 선택:",
-        options=["통합 코퍼스 확장 (8,645건 대상)", "팀원 프로토타입 표본 (295건 재현)"],
+        options=["통합 코퍼스 확장 (9,089건 대상)", "팀원 프로토타입 표본 (295건 재현)"],
         horizontal=True,
         key="tab8_data_mode"
     )
 
     st.markdown("---")
 
-    if data_mode == "통합 코퍼스 확장 (8,645건 대상)":
+    if data_mode == "통합 코퍼스 확장 (9,089건 대상)":
         # 1. k값 비교 평가
         st.markdown("#### 1. K-Means 최적 군집 수($k$) 비교 평가 (k = 5, 6, 8, 10, 12)")
         col_k1, col_k2 = st.columns([3, 2])
@@ -1647,7 +1658,7 @@ with tab8:
         st.markdown("#### 4. AI 하이브리드 추천 엔진 벤치마크 (5대 실무 시나리오)")
         st.markdown(
             "> **수식 검토 및 보정**: $\\text{최종 추천 점수} = (0.50 \\times \\text{Ko-SRoBERTa 의미}) + (0.35 \\times \\text{BM25 키워드}) + (0.15 \\times \\text{평점 신뢰성})$\n"
-            "> - **딥러닝 임베딩 도입**: 기존 LSA(100차원)를 Ko-SRoBERTa(768차원, jhgan/ko-sroberta-multitask) 전수(8,645건) 임베딩으로 교체\n"
+            "> - **딥러닝 임베딩 도입**: 기존 LSA(100차원)를 Ko-SRoBERTa(768차원, jhgan/ko-sroberta-multitask) 전수(9,089건) 임베딩으로 교체\n"
             "> - **개선 사항**: BM25 및 Ko-SRoBERTa 원점수를 [0, 100] Min-Max 정규화 적용\n"
             "> - **평점 결측 보정**: 평점이 없는 공공/신규 강좌는 Bayesian 중립값(80점) 부여\n"
             "> - **다회차 중복 제거**: 동일 강좌 반복 개설건을 배제하고 고유 과정만 상위 추천"
@@ -1928,7 +1939,7 @@ with tab8:
                 with m2:
                     st.metric("최고 추천 점수", f"{df_recom.iloc[0]['final_score']:.1f}점")
                 with m3:
-                    st.metric("조건 통과 후보군", f"{n_candidates:,}건", f"전체 8,645건 중 {(n_candidates/8645*100):.1f}%")
+                    st.metric("조건 통과 후보군", f"{n_candidates:,}건", f"전체 9,089건 중 {(n_candidates/len(df_main)*100):.1f}%")
                 with m4:
                     st.metric("109건 방어 현황", f"차단 {n_ex_109}건 / 유지 {n_pr_109}건")
 
@@ -2087,9 +2098,9 @@ with tab8:
 # 탭 9: 교육과정 토픽·군집 분석 (STEP 5-3)
 # ------------------------------------------------------------------------------
 with tab9:
-    st.header("🌐 교육과정 토픽모델링 및 K-Means 군집 분석 (8,645건 전수)")
+    st.header("🌐 교육과정 토픽모델링 및 K-Means 군집 분석 (9,089건 전수)")
     st.markdown(
-        "Ko-SRoBERTa 768차원 임베딩 공간에서 8,645건 통합 교육과정을 비지도 군집화(K-Means k=10)하고, "
+        "Ko-SRoBERTa 768차원 임베딩 공간에서 9,089건 통합 교육과정을 비지도 군집화(K-Means k=10)하고, "
         "c-TF-IDF 핵심 토픽 키워드와 중심점(Centroid) 대표 강좌를 도출하여 NCS·KSA 역량과의 연계성을 다각도로 검증한 분석 화면입니다."
     )
     st.caption("⚠️ **안내**: 본 화면의 군집 번호 및 토픽명은 비지도학습 탐색을 위해 자동 생성된 분석용 라벨이며, 공식 국가직무능력표준(NCS) 분류명과 엄격히 구분됩니다.")
@@ -2156,7 +2167,7 @@ with tab9:
             
             with st.expander("ℹ️ 왜 k=8 대신 k=10을 선정했는가?"):
                 st.markdown(
-                    "• **팀원 295건 프로토타입**: 295건 소규모 표본에서는 k=8로 단순화되었으나, 8,645건 전수 데이터에서는 공공 평생교육(GSEEK 1,991건)과 글로벌 어학(멀티캠퍼스 1,116건)이 유입되었습니다.\n"
+                    "• **팀원 295건 프로토타입**: 295건 소규모 표본에서는 k=8로 단순화되었으나, 9,089건 전수 데이터에서는 공공 평생교육(GSEEK 1,991건)과 글로벌 어학(멀티캠퍼스 1,116건)이 유입되었습니다.\n"
                     "• **k=8의 한계**: IT/데이터와 생성형AI가 혼재되고, 글로벌 어학과 공공교양이 HR/조직문화 군집을 오염시키는 현상 발생.\n"
                     "• **k=10의 강점**: 법정의무/안전(C5), 생성형AI/스마트워크(C6), 글로벌어학(C7), HRD전문자격(C9) 등이 독립된 군집으로 정교하게 분리되어 군집 크기 표준편차(306.4)가 크게 완화됨."
                 )
@@ -2304,7 +2315,7 @@ def get_cached_competency_recommender():
 with tab10:
     st.header("🎖️ NCS·KSA 직무역량 맞춤형 교육 추천")
     st.markdown(
-        "인사·총무·경영지원 실무 담당자를 위한 **직무역량 기반 맞춤형 추천 파이프라인**입니다. "
+        "인사 실무 담당자를 위한 **직무역량 기반 맞춤형 추천 파이프라인**입니다. "
         "탭 8과 100% 동일한 통합 엔진(`UnifiedHybridRecommender`)을 기반으로 "
         "사용자가 입력한 직무 및 KSA 역량에 대해 **4축 정밀 스코어링(Ko-SRoBERTa 50% + BM25 30% + 난이도 10% + 군집부스팅 + KSA보조매핑 5%)**을 거쳐 "
         "오매핑 의심 109건을 선별 차단(96건 차단 / 13건 보존)하고 실제 커리큘럼에 기반한 맞춤형 추천과 구체적 추천 근거를 제공합니다."
