@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.24.0"
+__generated_with = "0.25.1"
 app = marimo.App(width="full", app_title="표준 기업 HR 직무역량 & 직급별 커리어 성장 로드맵 대시보드")
 
 
@@ -49,6 +49,12 @@ def _(Path, json, pd):
     df_candidates = pd.DataFrame()
     if candidates_path.exists():
         df_candidates = pd.read_csv(candidates_path)
+
+    df_scope = df_candidates
+    if "recommendation_readiness" in df_candidates.columns:
+        df_scope = df_candidates[
+            df_candidates["recommendation_readiness"].isin(["TIER_1_READY", "TIER_2_CONDITIONAL"])
+        ].copy()
 
     # -------------------------------------------------------------------------
     # 2. 직급별 실무 산출물(Deliverables) 및 공인 우대 자격증 마스터
@@ -112,7 +118,7 @@ def _(Path, json, pd):
     }
 
     domains = sorted(list(set(j["domain"] for j in hr_master))) if hr_master else []
-    return audit_metrics, domains, grade_metadata, hr_master
+    return df_candidates, df_scope, domains, grade_metadata, hr_master
 
 
 @app.cell
@@ -318,7 +324,7 @@ def _(cur_grade, cur_meta, go, mo, tar_grade, tar_grade_data, tar_meta):
                 {tar_meta['level']}
               </span>
             </div>
-        
+    
             {mo.as_html(fig_radar)}
 
             <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 14px; margin-top: 14px;">
@@ -339,7 +345,7 @@ def _(cur_grade, cur_meta, go, mo, tar_grade, tar_grade_data, tar_meta):
             <h3 style="margin: 0 0 12px 0; font-size: 16px; font-weight: 700; color: #1E293B;">
               📋 {tar_grade} 승진 시 독립 수행해야 하는 필수 과업 (Pure Atomic Tasks)
             </h3>
-        
+    
             {tasks_html}
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px;">
@@ -482,7 +488,7 @@ def _(mo, tar_grade, tar_grade_data):
 
 
 @app.cell
-def _(go, mo, pd, px):
+def _(df_scope, go, mo, pd, px):
     # -------------------------------------------------------------------------
     # TAB 3: 📊 노동시장 수급 갭 분석 (Labor Market Intelligence)
     # -------------------------------------------------------------------------
@@ -519,10 +525,12 @@ def _(go, mo, pd, px):
     )
 
     # 직급별 공급 편중도 차트
+    scope_total = len(df_scope)
+    n_low = int(df_scope["course_level"].isin(["입문/초급", "중급/실무"]).sum())
+    n_high = int((df_scope["course_level"] == "고급/전문").sum())
     level_dist = pd.DataFrame([
-        {"level": "L1~L2 (신입·초급 실무)", "count": 279, "share": "94.6%"},
-        {"level": "L3 (중간관리·제도설계)", "count": 12, "share": "4.1%"},
-        {"level": "L4~L5 (시니어·전략리딩)", "count": 4, "share": "1.3%"}
+        {"level": "L1~L2 (신입·초급 실무)", "count": n_low},
+        {"level": "L3~L5 (중간관리·전략리딩)", "count": n_high},
     ])
     fig_level = px.pie(
         level_dist,
@@ -531,8 +539,7 @@ def _(go, mo, pd, px):
         color="level",
         color_discrete_map={
             "L1~L2 (신입·초급 실무)": "#38BDF8",
-            "L3 (중간관리·제도설계)": "#F59E0B",
-            "L4~L5 (시니어·전략리딩)": "#EF4444"
+            "L3~L5 (중간관리·전략리딩)": "#EF4444"
         },
         hole=0.45
     )
@@ -563,7 +570,7 @@ def _(go, mo, pd, px):
 
             <div>
               <h4 style="margin: 0 0 10px 0; font-size: 14.5px; color: #334155;">
-                ⚠️ 직급(숙련도)별 훈련과정 공급 편중도 (총 295개 강좌)
+                ⚠️ 직급(숙련도)별 훈련과정 공급 편중도 (인사 범위 {scope_total}개 강좌)
               </h4>
               {mo.as_html(fig_level)}
             </div>
@@ -579,8 +586,8 @@ def _(go, mo, pd, px):
                 HR 데이터 분석(HR Analytics)과 구조화 면접관 실습 과정은 시장 수요가 95점이나 공급은 15점에 불과하여 신규 강좌 개설의 사업성이 매우 높음.
               </div>
               <div style="background: white; border: 1px solid #E2E8F0; padding: 12px; border-radius: 6px;">
-                <strong style="color: #D97706;">② L3~L5 심화 과정 결핍:</strong><br>
-                현재 공공 교육의 94.6%가 L1~L2(사원/주임)에 편중되어 있어, 대리·과장 승진자를 위한 중급 제도설계/평가보상 과정 확충이 시급함.
+                <strong style="color: #D97706;">② L3~L5 심화 과정 결핍({n_high}개):</strong><br>
+                현재 공공 교육의 {n_low / scope_total * 100:.1f}%가 L1~L2(사원/주임)에 편중되어 있어, 대리·과장 승진자를 위한 중급 제도설계/평가보상 과정 확충이 시급함.
               </div>
               <div style="background: white; border: 1px solid #E2E8F0; padding: 12px; border-radius: 6px;">
                 <strong style="color: #059669;">③ 단순 자격증 탈피:</strong><br>
@@ -595,19 +602,27 @@ def _(go, mo, pd, px):
 
 
 @app.cell
-def _(audit_metrics, mo, pd, px):
+def _(df_candidates, df_scope, mo, pd, px):
     # -------------------------------------------------------------------------
     # TAB 4: 🛡️ 데이터 공신력 & 품질 거버넌스 (Data Reliability & Audit Metrics)
     # -------------------------------------------------------------------------
-    total_c = audit_metrics.get("total_courses", 295)
-    t1_ready = audit_metrics.get("recommendation_readiness", {}).get("tier1_ready", 205)
-    t2_cond = audit_metrics.get("recommendation_readiness", {}).get("tier2_conditional", 89)
-    outlier = audit_metrics.get("recommendation_readiness", {}).get("excluded_outlier", 1)
+    total_c = len(df_candidates)
+    scope_n = len(df_scope)
+    t1_ready = int((df_scope["recommendation_readiness"] == "TIER_1_READY").sum())
+    t2_cond = int((df_scope["recommendation_readiness"] == "TIER_2_CONDITIONAL").sum())
+    outlier = total_c - scope_n
+    n_multi = int((df_scope["competency_count"] > 1).sum())
+    n_rows = int(df_scope["competency_count"].sum())
+    n_review = int((df_scope["mapping_verification_tier"] == "REVIEW_NEEDED").sum())
+    n_free = int((df_scope["course_fee"] == 0).sum())
+    n_employer = int((df_scope["fee_type"] == "EMPLOYER_TRAINING").sum())
+    n_work24_cost = int(df_scope["work24_training_cost"].notna().sum())
+    fee_median = df_scope.loc[df_scope["fee_type"] == "STANDARD_PAID", "course_fee"].median()
 
     readiness_df = pd.DataFrame([
         {"status": "TIER 1 (즉시 추천 가능)", "count": t1_ready, "share": f"{t1_ready/total_c*100:.1f}%"},
         {"status": "TIER 2 (조건부 보조 추천)", "count": t2_cond, "share": f"{t2_cond/total_c*100:.1f}%"},
-        {"status": "EXCLUDED (이상치 격리)", "count": outlier, "share": f"{outlier/total_c*100:.1f}%"}
+        {"status": "EXCLUDED (범위 밖·검수 제외·이상치)", "count": outlier, "share": f"{outlier/total_c*100:.1f}%"}
     ])
 
     fig_readiness = px.bar(
@@ -619,7 +634,7 @@ def _(audit_metrics, mo, pd, px):
         color_discrete_map={
             "TIER 1 (즉시 추천 가능)": "#10B981",
             "TIER 2 (조건부 보조 추천)": "#F59E0B",
-            "EXCLUDED (이상치 격리)": "#EF4444"
+            "EXCLUDED (범위 밖·검수 제외·이상치)": "#EF4444"
         }
     )
     fig_readiness.update_layout(height=300, showlegend=False, margin=dict(l=10, r=10, t=10, b=10))
@@ -635,14 +650,14 @@ def _(audit_metrics, mo, pd, px):
               🛡️ 데이터 품질 및 공신력 거버넌스 지표 (Recommendation Readiness)
             </h3>
             <p style="margin: 4px 0 0 0; color: #64748B; font-size: 13px;">
-              추천 결과의 오류를 원천 차단하고 신뢰도를 보장하기 위해 295개 강좌 전수를 대상으로 실시한 4대 정밀 감사 지표입니다.
+              추천 결과의 오류를 원천 차단하고 신뢰도를 보장하기 위해 {total_c}개 강좌 전수를 검수해 인사 범위 {scope_n}개를 확정하고, 이를 대상으로 산출한 4대 정밀 감사 지표입니다.
             </p>
           </div>
 
           <div style="display: grid; grid-template-columns: 1fr 1.3fr; gap: 24px; margin-bottom: 20px;">
             <div>
               <h4 style="margin: 0 0 8px 0; font-size: 14px; color: #334155;">
-                🎯 추천 준비도 등급 분포 (Total 295건)
+                🎯 추천 준비도 등급 분포 (Total {total_c}건)
               </h4>
               {mo.as_html(fig_readiness)}
             </div>
@@ -653,27 +668,27 @@ def _(audit_metrics, mo, pd, px):
               </h4>
               <div style="display: flex; flex-direction: column; gap: 10px; font-size: 12.5px;">
                 <div style="background: #F8FAFC; border-left: 4px solid #10B981; padding: 10px 14px; border-radius: 4px;">
-                  <strong>1. 1:N 복합 역량 매핑 (358행 확장):</strong><br>
-                  채용과 노무를 함께 다루는 62개 복합 강좌를 발굴하여 주역량(VERIFIED_CORE)과 연계역량(VERIFIED_MULTI)으로 정규화.
+                  <strong>1. 1:N 복합 역량 매핑 ({n_rows}행 확장):</strong><br>
+                  채용과 노무를 함께 다루는 {n_multi}개 복합 강좌를 발굴하여 주역량(VERIFIED_CORE)과 연계역량(VERIFIED_MULTI)으로 정규화.
                 </div>
                 <div style="background: #F8FAFC; border-left: 4px solid #F59E0B; padding: 10px 14px; border-radius: 4px;">
-                  <strong>2. 키워드 미검출 강좌(27건) 안전 격리:</strong><br>
-                  본문 내 핵심 역량 키워드가 미검출된 27건은 REVIEW_NEEDED 등급을 부여하여 추천 신뢰도를 보존.
+                  <strong>2. 키워드 미검출 강좌({n_review}건) 안전 격리:</strong><br>
+                  본문 내 핵심 역량 키워드가 미검출된 {n_review}건은 REVIEW_NEEDED 등급을 부여하여 추천 신뢰도를 보존.
                 </div>
                 <div style="background: #F8FAFC; border-left: 4px solid #EF4444; padding: 10px 14px; border-radius: 4px;">
                   <strong>3. 890만 원짜리 해외연수 이상치(Outlier) 격리:</strong><br>
                   항공/숙박이 포함된 특수 상품 1건을 발견하여 일반 직무 교육 추천 풀에서 왜곡 방지를 위해 완전 격리.
                 </div>
                 <div style="background: #F8FAFC; border-left: 4px solid #3B82F6; padding: 10px 14px; border-radius: 4px;">
-                  <strong>4. 0원 무료 강좌 64건 실증 규명:</strong><br>
-                  고용24 사업주 전액환급(44건), 지자체 무료(17건) 등 실제 무료 강좌임을 전수 확인하여 예산 맞춤 추천 풀 확보.
+                  <strong>4. 수강료 0원 강좌 {n_free}건 실증 규명:</strong><br>
+                  '무료'로 잘못 표시되던 사업주훈련 {n_employer}건은 고용24 실제 훈련비(확인 {n_work24_cost}건)를 함께 표시하고, 실제 무료 강좌만 구분하여 예산 맞춤 추천 풀 확보.
                 </div>
               </div>
             </div>
           </div>
 
           <div style="background: #EEF2FF; border: 1px solid #E0E7FF; border-radius: 8px; padding: 16px; font-size: 12.5px; color: #3730A3;">
-            <strong>📌 최종 감사 판정: GO (승인 완료)</strong> — 신뢰도 높은 TIER 1 강좌 비율 69.5% 확보, 수강료 중앙값 280,000원을 채택하여 통계적 대표값 왜곡을 방지했습니다.
+            <strong>📌 최종 감사 판정: GO (승인 완료)</strong> — 신뢰도 높은 TIER 1 강좌 비율 {t1_ready / scope_n * 100:.1f}% 확보, 정규 유료 과정 수강료 중앙값 {fee_median:,.0f}원을 채택하여 통계적 대표값 왜곡을 방지했습니다.
           </div>
         </div>
         """

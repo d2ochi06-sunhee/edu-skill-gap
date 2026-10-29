@@ -16,7 +16,8 @@
 | **고객 서비스** (v2.1) | `customer_dashboard/streamlit_customer.py` | `streamlit run app.py` |
 | **발표 자료** | `presentation/index.html` (배포: https://hr-edu-map.vercel.app) | 브라우저로 열기 |
 | 내부 분석 대시보드 | `app/streamlit_integrated.py` | `streamlit run app/streamlit_integrated.py` |
-| 발표용 marimo 대시보드 | `app_marimo.py` → `dashboard.html` | `marimo export html app_marimo.py -o dashboard.html` |
+| **최종 대시보드** (인사·총무 직무 성장·교육 안내) | `dashboard.html` | 브라우저로 열기 |
+| 이전 marimo 대시보드 | `app_marimo.py` → `archive/` | `marimo export html app_marimo.py -o archive/marimo_dashboard.html --no-include-code` |
 | 1차 탐색 공개 화면 | `src/dashboard/public_app.py` | `streamlit run src/dashboard/app.py` |
 | 예전 화면 | `legacy/` (HTML 고객 화면 2종, 성장 경로, 온보딩 대시보드) | `legacy/README.md` 참고 |
 
