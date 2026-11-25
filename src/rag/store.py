@@ -2,17 +2,17 @@
 from __future__ import annotations
 
 import json
+import os
 import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
 
-import chromadb
-
 from .chunking import chunk_document
 from .config import (CHROMA_DIR, COLLECTION, DASHBOARD_DIR, DEFAULT_LOCAL_DOCS, EXTRA_DOC_DIR, MANIFEST_PATH,
                      ROOT, SUPPORTED_EXT, URL_LIST_PATH, RagSettings)
 from .embedder import Embedder
+from .hybrid import BM25, LRUCache, expand_query, rrf
 from .loaders import Document, load_dashboard_data, load_document, load_url
 
 EMBED_BATCH = 32
@@ -23,6 +23,9 @@ class Hit:
     text: str
     score: float          # 코사인 유사도 (1 - 코사인 거리)
     metadata: dict
+    bm25_rank: int | None = None      # 하이브리드 검색 투명성용 순위(1부터). 후보에 없으면 None
+    vec_rank: int | None = None
+    rrf: float | None = None
 
 
 def _fingerprint(path: Path) -> str:
@@ -31,6 +34,9 @@ def _fingerprint(path: Path) -> str:
 
 
 def latest_dashboard() -> Path | None:
+    pinned = os.getenv("RAG_DASHBOARD", "").strip()     # 배포할 대시보드 파일명을 고정(예: hr_..._rag_clean.html)
+    if pinned and (DASHBOARD_DIR / pinned).is_file():
+        return DASHBOARD_DIR / pinned
     files = sorted(DASHBOARD_DIR.glob("hr_career_platform_v2_*.html"))
     return files[-1] if files else None
 
@@ -67,8 +73,13 @@ class RagStore:
         self.embedder = embedder
         self._lock = threading.Lock()
         CHROMA_DIR.mkdir(parents=True, exist_ok=True)
+        import chromadb      # 무거운 의존성: 경량(lite) 모드에서는 불러오지 않도록 지연 import
+
         self._client = chromadb.PersistentClient(path=str(CHROMA_DIR))
         self._col = self._open_collection()
+        self._cache = LRUCache(256)       # 같은 질문 반복 시 즉시 반환
+        self._bm25: BM25 | None = None
+        self._bm25_rows: list[tuple[str, dict]] = []
 
     # ------------------------------------------------------------ 컬렉션 / 매니페스트
     @property
@@ -101,6 +112,9 @@ class RagStore:
     def _save_manifest(m: dict) -> None:
         MANIFEST_PATH.parent.mkdir(parents=True, exist_ok=True)
         MANIFEST_PATH.write_text(json.dumps(m, ensure_ascii=False, indent=1), encoding="utf-8")
+
+    def _count(self) -> int:
+        return self._col.count()
 
     # ------------------------------------------------------------ 색인
     def _upsert_document(self, doc: Document, manifest: dict, fp: str | None) -> int:
@@ -185,7 +199,9 @@ class RagStore:
 
             self._save_manifest(manifest)
             report["seconds"] = round(time.time() - t0, 2)
-            report["total_chunks"] = self._col.count()
+            report["total_chunks"] = self._count()
+            self._cache.clear()
+            self._bm25 = None             # 색인이 바뀌면 BM25 도 다시 만듭니다
             return report
 
     # ------------------------------------------------------------ 검색
@@ -206,9 +222,52 @@ class RagStore:
                 hits.append(Hit(text=text, score=score, metadata=meta))
         return hits
 
+    def _ensure_bm25(self) -> BM25:
+        if self._bm25 is None:
+            got = self._col.get(include=["documents", "metadatas"])
+            self._bm25_rows = list(zip(got["documents"], got["metadatas"]))
+            self._bm25 = BM25([t for t, _ in self._bm25_rows])
+        return self._bm25
+
+    def hybrid_search(self, query: str, top_k: int = 5, threshold: float | None = None,
+                      w_bm25: float = 1.0, w_vec: float = 1.0, pool: int = 30) -> list[Hit]:
+        """BM25 순위와 벡터 순위를 RRF(k=60)로 융합합니다.
+
+        근거 게이트: 벡터 코사인 유사도가 임계값 이상인 후보만 통과시킵니다(자료에 없는 질문을
+        BM25 우연 일치로 답하지 않도록). BM25 는 통과한 후보들의 순서를 정하는 데 기여합니다.
+        """
+        n = self._col.count()
+        if n == 0:
+            return []
+        if threshold is None:
+            threshold = self.embedder.default_threshold
+        key = (query, top_k, round(threshold, 3), w_bm25, w_vec)
+        cached = self._cache.get(key)
+        if cached is not None:
+            return cached
+
+        res = self._col.query(query_embeddings=[self.embedder.embed_query(query)],
+                              n_results=min(pool, n), include=["documents", "metadatas", "distances"])
+        vec = [(t, m, 1.0 - float(d)) for t, m, d in
+               zip(res["documents"][0], res["metadatas"][0], res["distances"][0])]
+        vec_rank = {t: r for r, (t, _, _) in enumerate(vec, 1)}
+
+        bm = self._ensure_bm25()
+        bm_top = bm.top(expand_query(query), pool)
+        bm_rank = {self._bm25_rows[i][0]: r for r, (i, _) in enumerate(bm_top, 1)}
+        by_text = {t: m for t, m, _ in vec} | {self._bm25_rows[i][0]: self._bm25_rows[i][1] for i, _ in bm_top}
+
+        fused = rrf([(w_vec, [t for t, _, _ in vec]), (w_bm25, [self._bm25_rows[i][0] for i, _ in bm_top])])
+        cos = {t: s for t, _, s in vec}
+        hits = [Hit(text=t, score=cos[t], metadata=by_text[t], bm25_rank=bm_rank.get(t),
+                    vec_rank=vec_rank.get(t), rrf=round(f, 5))
+                for t, f in sorted(fused.items(), key=lambda x: -x[1]) if t in cos and cos[t] >= threshold][:top_k]
+        self._cache.put(key, hits)
+        return hits
+
     def stats(self) -> dict:
         m = self._load_manifest()
-        return {"chunks": self._col.count(), "documents": len(m["docs"]),
+        return {"chunks": self._count(), "documents": len(m["docs"]),
                 "embedder": self.embedder.embedder_id, "default_threshold": self.embedder.default_threshold,
                 "docs": {k: {"title": v["title"], "chunks": v["chunks"], "format": v["format"]}
                          for k, v in m["docs"].items()}}

@@ -87,3 +87,6 @@ DAILY_LOG.md
 # RAG 벡터 DB / 색인 매니페스트 (재생성 가능)
 data/rag/chroma/
 data/rag/manifest.json
+
+# RAG lite index (regenerated on startup)
+data/rag/lite/

@@ -321,7 +321,7 @@ def load_dashboard_data(path: Path) -> list[Document]:
         cat = (data.get("cats", {}).get(c.get("cat"), {}) or {})
         cat_name = cat.get("name", c.get("cat", "")) if isinstance(cat, dict) else str(cat)
         target = ", ".join(grades[i] for i in c.get("grades", []) if i < len(grades))
-        text = (f"교육과정: {c.get('t', '')}\n교육기관: {c.get('inst', '')}\n플랫폼: {c.get('plat', '')}\n"
+        text = (f"식별코드: {c.get('id', '')}\n교육과정: {c.get('t', '')}\n교육기관: {c.get('inst', '')}\n플랫폼: {c.get('plat', '')}\n"
                 f"분야: {cat_name}\n추천 직급: {target or '전체'}")
         secs.append(Section(clean_text(text), section=f"{c.get('plat', '')} · {cat_name}", url=c.get("url", "")))
     docs.append(Document(f"{rel}#courses", "대시보드 · 교육과정 목록", link, "dashboard", secs))

@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: hr-career-chatbot
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements-deploy.txt
+    startCommand: python rag_server.py
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.4
+      - key: HOST
+        value: 0.0.0.0
+      - key: RAG_PUBLIC
+        value: "1"
+      - key: RAG_MODE
+        value: lite
+      - key: RAG_DASHBOARD
+        value: hr_career_platform_v2_2026-11-21_rag_clean.html
+      - key: ANTHROPIC_API_KEY
+        sync: false
