@@ -1,7 +1,7 @@
 """Streamlit Community Cloud 배포용 진입점: HR 커리어 대시보드 + 자료 기반 챗봇(BM25 경량 검색).
 
 배포 설정: Main file path = deploy/streamlit_app.py  (이 폴더의 requirements.txt 가 설치됨)
-Secrets  : ANTHROPIC_API_KEY = "sk-ant-..."
+Secrets  : GEMINI_API_KEY = "발급받은 키"
 """
 import os
 import sys
@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 try:
-    for _k in ("ANTHROPIC_API_KEY", "RAG_DASHBOARD"):
+    for _k in ("GEMINI_API_KEY", "RAG_DASHBOARD"):
         if _k in st.secrets:
             os.environ[_k] = str(st.secrets[_k])
 except Exception:
@@ -22,12 +22,12 @@ except Exception:
 os.environ.setdefault("RAG_DASHBOARD", "hr_career_platform_v2_2026-11-21_rag_clean.html")
 os.environ.setdefault("RAG_MODE", "lite")
 
-from src.rag.config import get_anthropic_key, get_settings  # noqa: E402
+from src.rag.config import get_llm_key, get_settings  # noqa: E402
 from src.rag.qa import stream_answer  # noqa: E402
 from src.rag.store import latest_dashboard  # noqa: E402
 from src.rag.store_lite import LiteStore  # noqa: E402
 
-MAX_QUESTIONS_PER_SESSION = 30      # Claude API 비용 보호
+MAX_QUESTIONS_PER_SESSION = 30      # LLM API 비용·한도 보호
 
 st.set_page_config(page_title="HR 커리어 플랫폼", page_icon="💼", layout="wide")
 
@@ -56,9 +56,10 @@ with tab_dash:
 
 with tab_chat:
     st.subheader("자료 기반 질문")
-    st.caption("수집된 교육과정·NCS 자료에서 찾은 내용으로만 답합니다. 자료에 없는 질문은 답하지 않아요.")
-    if not get_anthropic_key():
-        st.warning("ANTHROPIC_API_KEY 가 설정되지 않아 답변 대신 검색된 근거만 보여 드립니다.")
+    st.caption("수집된 교육과정·NCS 자료에서 찾은 내용으로만 답합니다. 자료에 없는 질문은 답하지 않아요. "
+               "질문은 Google Gemini API로 전송되니 이름 등 개인정보는 입력하지 마세요.")
+    if not get_llm_key():
+        st.warning("GEMINI_API_KEY 가 설정되지 않아 답변 대신 검색된 근거만 보여 드립니다.")
 
     st.session_state.setdefault("chat", [])
     st.session_state.setdefault("asked", 0)

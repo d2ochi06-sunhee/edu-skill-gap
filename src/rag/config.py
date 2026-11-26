@@ -46,9 +46,9 @@ class RagSettings:
     # auto: fastembed(ONNX) → sentence-transformers → hash(모델 없는 어휘 임베딩, 최후 대체)
     embed_backend: str = os.getenv("RAG_EMBED_BACKEND", "auto")
     embed_model: str = os.getenv("RAG_EMBED_MODEL", "intfloat/multilingual-e5-large")
-    llm_model: str = os.getenv("RAG_LLM_MODEL", "claude-sonnet-5-5")
+    llm_model: str = os.getenv("RAG_LLM_MODEL", "gemini-3.5-flash-lite")
     # 과부하(429/5xx/529)·연결 오류 시 앞에서부터 차례로 시도하는 모델 체인
-    llm_chain: str = os.getenv("RAG_LLM_CHAIN", "claude-sonnet-5-5,claude-haiku-5-5")
+    llm_chain: str = os.getenv("RAG_LLM_CHAIN", "gemini-3.5-flash-lite,gemini-3.1-flash-lite")
     chunk_size: int = int(os.getenv("RAG_CHUNK_SIZE", "600"))       # 글자 수
     chunk_overlap: int = int(os.getenv("RAG_CHUNK_OVERLAP", "100"))
     default_top_k: int = int(os.getenv("RAG_TOP_K", "5"))
@@ -68,6 +68,6 @@ def get_settings() -> RagSettings:
     return RagSettings()
 
 
-def get_anthropic_key() -> str | None:
-    key = os.getenv("ANTHROPIC_API_KEY", "").strip()
+def get_llm_key() -> str | None:
+    key = os.getenv("GEMINI_API_KEY", "").strip()
     return key or None

@@ -2362,7 +2362,7 @@ if (typeof module !== 'undefined') module.exports = RagEngine;
   status.textContent = `내장 검색 모드 · 문서 ${new Set(RAG_DOCS.map(d => d.d)).size}종 + 교육과정 ${DATA.courses.length.toLocaleString()}건`;
   showWelcome();
   const hint = $('ragHint');
-  const aiOff = 'AI 문장 답변은 꺼져 있습니다(켜려면 rag_server.py 실행 + http://127.0.0.1:8765 접속 + .env의 ANTHROPIC_API_KEY 필요). 지금은 자료에서 찾은 근거만 보여 줍니다.';
+  const aiOff = 'AI 문장 답변은 꺼져 있습니다(켜려면 rag_server.py 실행 + http://127.0.0.1:8765 접속 + .env의 GEMINI_API_KEY 필요). 지금은 자료에서 찾은 근거만 보여 줍니다.';
   hint.textContent = aiOff;
   detectServer().then(() => { if (server) hint.textContent = 'AI 답변 모드: 찾은 근거로만 답이 실시간으로 작성되고, 답변은 Q&A 게시판에 자동 저장됩니다.'; });
 

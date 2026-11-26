@@ -1,7 +1,6 @@
-# 챗봇 경량 배포용 (RAG_MODE=lite, 기본값): BM25 검색 + Claude 호출만 사용
+# 챗봇 경량 배포용 (RAG_MODE=lite, 기본값): BM25 검색 + Gemini 호출만 사용
 # chromadb / fastembed / onnxruntime / torch 가 필요 없습니다.
 python-dotenv>=1.0.0
-anthropic>=0.40.0
 pypdf>=4.0.0
 requests>=2.31.0
 beautifulsoup4>=4.12.0

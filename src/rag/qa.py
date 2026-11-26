@@ -1,4 +1,4 @@
-"""검색된 근거와 출처만 LLM(Claude)에 전달해 답변합니다. 근거가 없으면 LLM을 호출하지 않습니다.
+"""검색된 근거와 출처만 LLM(Gemini)에 전달해 답변합니다. 근거가 없으면 LLM을 호출하지 않습니다.
 
 - 모델 체인: 과부하(429/5xx/529)·연결 오류가 나면 지연 없이 다음 모델로 자동 전환
 - 전면 장애: 검색된 근거 목록으로 대체 답변(Graceful Fallback)
@@ -13,7 +13,7 @@ import threading
 from dataclasses import dataclass, field
 from typing import Iterator
 
-from .config import NOT_FOUND_MESSAGE, RagSettings, get_anthropic_key, llm_models
+from .config import NOT_FOUND_MESSAGE, RagSettings, get_llm_key, llm_models
 from .store import Hit, RagStore
 
 SYSTEM_PROMPT = f"""당신은 인사(HR) 직무 성장·교육 안내 도우미입니다.
@@ -46,12 +46,12 @@ _client_cache: dict[str, object] = {}
 
 
 def get_client(key: str):
-    """API 키별로 Anthropic 클라이언트를 한 번만 만들어 연결을 재사용합니다."""
+    """API 키별로 Gemini 클라이언트를 한 번만 만들어 연결을 재사용합니다."""
     with _client_lock:
         if key not in _client_cache:
-            import anthropic
+            from .gemini import GeminiClient
 
-            _client_cache[key] = anthropic.Anthropic(api_key=key, max_retries=0, timeout=30.0)
+            _client_cache[key] = GeminiClient(key, timeout=30.0)
         return _client_cache[key]
 
 
@@ -60,7 +60,8 @@ def is_retryable(exc: Exception) -> bool:
     status = getattr(exc, "status_code", None)
     if status is not None:
         return status in _RETRYABLE_STATUS
-    return type(exc).__name__ in {"APIConnectionError", "APITimeoutError", "ConnectionError", "TimeoutError"}
+    return type(exc).__name__ in {"APIConnectionError", "APITimeoutError", "ConnectionError", "TimeoutError",
+                                  "ConnectTimeout", "ReadTimeout", "ChunkedEncodingError"}
 
 
 # ------------------------------------------------------------------ 컨텍스트 / 코드 검증
@@ -157,10 +158,10 @@ def stream_answer(store: RagStore, settings: RagSettings, question: str,
         return
 
     sources = [_source_dict(i, h) for i, h in enumerate(hits, 1)]
-    key = get_anthropic_key()
+    key = get_llm_key()
     if not key:
         yield {"type": "done", "found": True, "sources": sources, "codes": [], "model": "", "llm_used": False,
-               "answer": "ANTHROPIC_API_KEY 가 .env 에 없어 답변을 생성하지 않고 검색된 근거만 표시합니다.",
+               "answer": "GEMINI_API_KEY 가 .env 에 없어 답변을 생성하지 않고 검색된 근거만 표시합니다.",
                "note": "no_api_key"}
         return
 

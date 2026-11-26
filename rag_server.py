@@ -21,14 +21,14 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from src.rag import qna_db
-from src.rag.config import get_anthropic_key, get_settings, llm_models
+from src.rag.config import get_llm_key, get_settings, llm_models
 from src.rag.qa import answer_question, stream_answer
 from src.rag.store import RagStore, latest_dashboard
 from src.rag.store_lite import LiteStore
 
 SETTINGS = get_settings()
 PUBLIC = os.getenv("RAG_PUBLIC", "") == "1"     # 인터넷에 공개 배포할 때 1: 삭제·재색인 API 차단, 호출 횟수 제한
-RATE_LIMIT, RATE_WINDOW = int(os.getenv("RAG_RATE_LIMIT", "20")), 600   # IP당 10분에 20회(Claude API 비용 보호)
+RATE_LIMIT, RATE_WINDOW = int(os.getenv("RAG_RATE_LIMIT", "20")), 600   # IP당 10분에 20회(LLM API 비용·한도 보호)
 _hits: dict[str, deque] = defaultdict(deque)
 _hits_lock = threading.Lock()
 
@@ -113,7 +113,7 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/status":
             try:
                 s = get_store().stats()
-                s.update(llm_configured=bool(get_anthropic_key()), llm_model=SETTINGS.llm_model,
+                s.update(llm_configured=bool(get_llm_key()), llm_model=SETTINGS.llm_model,
                          default_top_k=SETTINGS.default_top_k, llm_chain=llm_models(SETTINGS))
                 return self._json(200, s)
             except Exception as exc:

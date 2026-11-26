@@ -2,7 +2,7 @@
 
 실행:  python scripts/eval_rag.py [--n 100] [--gen 10] [--seed 7]
 - 정답 세트: 대시보드 교육과정에서 무작위로 뽑은 과정의 제목 일부(앞 3개 단어)를 질문으로, 해당 식별코드를 정답으로 삼습니다.
-- 생성 평가는 .env 에 ANTHROPIC_API_KEY 가 있을 때만 실행합니다.
+- 생성 평가는 .env 에 GEMINI_API_KEY 가 있을 때만 실행합니다.
 """
 from __future__ import annotations
 
@@ -92,10 +92,10 @@ def eval_retrieval(store, queries) -> dict:
 
 
 def eval_generation(store, settings, queries, valid_ids: set[str]) -> dict | None:
-    from src.rag.config import get_anthropic_key
+    from src.rag.config import get_llm_key
     from src.rag.qa import CODE_RE, stream_answer
 
-    if not get_anthropic_key():
+    if not get_llm_key():
         return None
     ttft, total, recommended, fake = [], [], 0, 0
     for q, _ in queries:
@@ -143,7 +143,7 @@ def main():
     print("\n== 생성·그라운딩 품질 ==")
     gen = eval_generation(store, settings, queries[:args.gen], {c["id"] for c in courses})
     if gen is None:
-        print("ANTHROPIC_API_KEY 가 없어 생략했습니다.")
+        print("GEMINI_API_KEY 가 없어 생략했습니다.")
     else:
         for k, v in gen.items():
             print(f"{k}: {v:.1f}" if isinstance(v, float) else f"{k}: {v}")

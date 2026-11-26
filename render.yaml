@@ -16,5 +16,5 @@ services:
         value: lite
       - key: RAG_DASHBOARD
         value: hr_career_platform_v2_2026-11-21_rag_clean.html
-      - key: ANTHROPIC_API_KEY
+      - key: GEMINI_API_KEY
         sync: false
