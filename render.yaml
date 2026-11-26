@@ -15,6 +15,6 @@ services:
       - key: RAG_MODE
         value: lite
       - key: RAG_DASHBOARD
-        value: hr_career_platform_v2_2026-11-21_rag_clean.html
+        value: hr_career_platform_v2_2026-11-26_rag_clean.html
       - key: GEMINI_API_KEY
         sync: false

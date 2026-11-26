@@ -19,7 +19,7 @@ try:
             os.environ[_k] = str(st.secrets[_k])
 except Exception:
     pass
-os.environ.setdefault("RAG_DASHBOARD", "hr_career_platform_v2_2026-11-21_rag_clean.html")
+os.environ.setdefault("RAG_DASHBOARD", "hr_career_platform_v2_2026-11-26_rag_clean.html")
 os.environ.setdefault("RAG_MODE", "lite")
 
 from src.rag.config import get_llm_key, get_settings  # noqa: E402
